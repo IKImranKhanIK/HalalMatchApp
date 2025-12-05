@@ -72,8 +72,8 @@ export async function GET(request: NextRequest) {
       // Find reverse selection
       const reverseExists = selectionsArray.find(
         (s) =>
-          s.selector?.participant_number === selection.selected.participant_number &&
-          s.selected?.participant_number === selection.selector.participant_number
+          s.selector?.participant_number === selection.selected?.participant_number &&
+          s.selected?.participant_number === selection.selector?.participant_number
       );
 
       if (reverseExists) {
