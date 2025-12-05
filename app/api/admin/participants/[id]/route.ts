@@ -81,9 +81,10 @@ export async function PATCH(
       );
     }
 
+    // @ts-ignore - Supabase type inference issue
     const { data: participant, error } = await supabase
       .from('participants')
-      .update(updates as any)
+      .update(updates)
       .eq('id', id)
       .select()
       .single();
