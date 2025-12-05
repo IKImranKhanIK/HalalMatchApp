@@ -29,6 +29,7 @@ export default function AdminParticipantsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     fetchParticipants();
@@ -115,6 +116,33 @@ export default function AdminParticipantsPage() {
       setError(err instanceof Error ? err.message : "Failed to update status");
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const deleteParticipant = async (participantId: string, participantName: string) => {
+    if (!confirm(`Are you sure you want to delete ${participantName}? This will also delete all their selections. This cannot be undone!`)) {
+      return;
+    }
+
+    try {
+      setDeleting(participantId);
+      setError("");
+
+      const response = await fetch(`/api/admin/participants/${participantId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete participant");
+      }
+
+      // Remove from local state
+      setParticipants((prev) => prev.filter((p) => p.id !== participantId));
+      alert("Participant deleted successfully");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete participant");
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -240,7 +268,7 @@ export default function AdminParticipantsPage() {
                               onClick={() =>
                                 updateBackgroundCheck(participant.id, "approved")
                               }
-                              disabled={updating === participant.id}
+                              disabled={updating === participant.id || deleting === participant.id}
                               loading={updating === participant.id}
                             >
                               Approve
@@ -253,11 +281,23 @@ export default function AdminParticipantsPage() {
                               onClick={() =>
                                 updateBackgroundCheck(participant.id, "rejected")
                               }
-                              disabled={updating === participant.id}
+                              disabled={updating === participant.id || deleting === participant.id}
                             >
                               Reject
                             </Button>
                           )}
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() =>
+                              deleteParticipant(participant.id, participant.full_name)
+                            }
+                            disabled={updating === participant.id || deleting === participant.id}
+                            loading={deleting === participant.id}
+                            className="bg-red-500/20 hover:bg-red-500/30 border-red-500/30"
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </td>
                     </tr>

@@ -24,6 +24,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -46,6 +47,58 @@ export default function AdminDashboardPage() {
       setError(err instanceof Error ? err.message : "Failed to load stats");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetSelections = async () => {
+    if (!confirm("Are you sure you want to clear ALL selections? This cannot be undone!")) {
+      return;
+    }
+
+    try {
+      setResetting(true);
+      const response = await fetch("/api/admin/reset/selections", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to reset selections");
+      }
+
+      alert("All selections have been cleared successfully!");
+      fetchStats();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reset selections");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleResetEverything = async () => {
+    if (!confirm("⚠️ WARNING: This will delete ALL participants and selections. This cannot be undone! Are you absolutely sure?")) {
+      return;
+    }
+
+    if (!confirm("This is your final warning. All data will be permanently deleted. Continue?")) {
+      return;
+    }
+
+    try {
+      setResetting(true);
+      const response = await fetch("/api/admin/reset/participants", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to reset database");
+      }
+
+      alert("All data has been cleared successfully!");
+      fetchStats();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to reset database");
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -275,6 +328,58 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Danger Zone */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-red-400">⚠️ Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
+              <p className="text-[#bfc0c0] text-sm mb-4">
+                These actions are permanent and cannot be undone. Use with caution.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-white">Clear All Selections</h4>
+                    <p className="text-[#bfc0c0] text-sm">
+                      Delete all participant selections but keep participant data
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={handleResetSelections}
+                    disabled={resetting}
+                    className="ml-4 bg-red-500/20 hover:bg-red-500/30 border-red-500/30"
+                  >
+                    {resetting ? "Clearing..." : "Clear Selections"}
+                  </Button>
+                </div>
+                <div className="border-t border-red-500/20 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-white">Reset Everything</h4>
+                      <p className="text-[#bfc0c0] text-sm">
+                        Delete ALL participants and selections - complete reset
+                      </p>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      onClick={handleResetEverything}
+                      disabled={resetting}
+                      className="ml-4 bg-red-600/20 hover:bg-red-600/30 border-red-600/30"
+                    >
+                      {resetting ? "Resetting..." : "Reset All Data"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -2,6 +2,7 @@
  * Admin Single Participant API
  * GET /api/admin/participants/[id] - Get single participant
  * PATCH /api/admin/participants/[id] - Update participant
+ * DELETE /api/admin/participants/[id] - Delete participant
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -104,6 +105,52 @@ export async function PATCH(
     });
   } catch (error) {
     console.error('Update participant error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const supabase = createServerClient();
+
+    // First, delete all selections where this participant is involved
+    await supabase
+      .from('interest_selections')
+      .delete()
+      .or(`selector_id.eq.${id},selected_id.eq.${id}`);
+
+    // Then delete the participant
+    const { error } = await supabase
+      .from('participants')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Delete participant error:', error);
+      return NextResponse.json(
+        { error: 'Failed to delete participant' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Participant deleted successfully',
+    });
+  } catch (error) {
+    console.error('Delete participant error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
