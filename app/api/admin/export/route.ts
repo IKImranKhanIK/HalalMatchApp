@@ -7,6 +7,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { auth } from '@/lib/auth/auth';
 
+interface ParticipantData {
+  participant_number: number;
+  full_name: string;
+  gender: string;
+  email: string;
+  phone: string;
+}
+
+interface SelectionData {
+  id: string;
+  created_at: string;
+  selector: ParticipantData | null;
+  selected: ParticipantData | null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -49,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate mutual matches
     const mutualMatches = new Set<string>();
-    const selectionsArray = selections || [];
+    const selectionsArray: SelectionData[] = (selections as SelectionData[]) || [];
 
     for (const selection of selectionsArray) {
       if (!selection.selector || !selection.selected) continue;
