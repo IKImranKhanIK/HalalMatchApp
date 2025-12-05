@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -8,7 +8,7 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Logo from "@/components/shared/Logo";
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/admin/dashboard";
@@ -135,5 +135,20 @@ export default function AdminLoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#2d3142] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#ef8354] mx-auto"></div>
+          <p className="mt-4 text-[#bfc0c0]">Loading...</p>
+        </div>
+      </div>
+    }>
+      <AdminLoginForm />
+    </Suspense>
   );
 }
