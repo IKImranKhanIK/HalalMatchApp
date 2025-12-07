@@ -1,5 +1,5 @@
 /**
- * Middleware for Route Protection
+ * Proxy for Route Protection (Next.js 16)
  * Protects admin routes with NextAuth
  * Protects participant routes with session check
  */
@@ -8,7 +8,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth/auth';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Protect admin routes
@@ -31,16 +31,17 @@ export async function middleware(request: NextRequest) {
 
   // Protect participant routes
   if (pathname.startsWith('/select') || pathname.startsWith('/my-selections')) {
-    // Check for participant session in cookies or localStorage
-    // Note: localStorage check needs to be done client-side
-    // We'll redirect to login if no session found
-    const participantSession = request.cookies.get('participant_session');
+    // Check for participant JWT token in cookies
+    const participantToken = request.cookies.get('participant_token');
 
-    if (!participantSession) {
+    if (!participantToken) {
       // Redirect to participant login
       const url = new URL('/login', request.url);
       return NextResponse.redirect(url);
     }
+
+    // Token verification is handled by the API routes
+    // This is just a basic check for the presence of the token
   }
 
   return NextResponse.next();

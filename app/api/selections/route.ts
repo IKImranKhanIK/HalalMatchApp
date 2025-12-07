@@ -6,17 +6,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { getCurrentParticipant } from '@/lib/auth/jwt';
 
 export async function GET(request: NextRequest) {
   try {
-    const participantId = request.headers.get('x-participant-id');
+    const participant = await getCurrentParticipant();
 
-    if (!participantId) {
+    if (!participant) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+
+    const participantId = participant.participantId;
 
     const supabase = createServerClient();
 
@@ -56,14 +59,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const participantId = request.headers.get('x-participant-id');
+    const participant = await getCurrentParticipant();
 
-    if (!participantId) {
+    if (!participant) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
+
+    const participantId = participant.participantId;
 
     const body = await request.json();
     const { selected_participant_number } = body;
@@ -76,9 +81,10 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createServerClient();
+    const supabaseAny: any = supabase;
 
     // Get the selected participant's ID from their number
-    const { data: selectedParticipant, error: lookupError } = await supabase
+    const { data: selectedParticipant, error: lookupError } = await supabaseAny
       .from('participants')
       .select('id, participant_number')
       .eq('participant_number', selected_participant_number)
@@ -101,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the selection
-    const { data: selection, error: insertError } = await supabase
+    const { data: selection, error: insertError } = await supabaseAny
       .from('interest_selections')
       .insert({
         selector_id: participantId,

@@ -1,14 +1,20 @@
 "use client";
 
+// React hooks for component state and lifecycle management
 import { useState } from "react";
+// Next.js router for client-side navigation
 import { useRouter } from "next/navigation";
+// UI components for card layout and structure
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+// Form input components for user data entry
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
+// Loading spinner component for async operations
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
-import Image from "next/image";
+// Session management utility for storing participant data
 import { saveParticipantSession } from "@/lib/auth/participant-session";
+// Logo component for branding
 import Logo from "@/components/shared/Logo";
 
 interface RegistrationSuccess {
@@ -32,13 +38,59 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState<RegistrationSuccess | null>(null);
 
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-numeric characters
+    const phoneNumber = value.replace(/\D/g, '');
+
+    // Format based on length
+    if (phoneNumber.length <= 3) {
+      return phoneNumber;
+    } else if (phoneNumber.length <= 6) {
+      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`;
+    } else {
+      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
+    }
+  };
+
+  const capitalizeName = (value: string) => {
+    // Capitalize first letter of each word
+    return value
+      .split(' ')
+      .map(word => {
+        if (word.length === 0) return word;
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      })
+      .join(' ');
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+
+    // Format phone number as user types
+    if (name === 'phone') {
+      const formatted = formatPhoneNumber(value);
+      setFormData((prev) => ({
+        ...prev,
+        phone: formatted,
+      }));
+    }
+    // Capitalize full name as user types
+    else if (name === 'full_name') {
+      const capitalized = capitalizeName(value);
+      setFormData((prev) => ({
+        ...prev,
+        full_name: capitalized,
+      }));
+    }
+    else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+
     setError(""); // Clear error on input change
   };
 
@@ -56,12 +108,23 @@ export default function RegisterPage() {
         body: JSON.stringify({
           ...formData,
           participant_number: parseInt(formData.participant_number),
+          phone: formData.phone.replace(/\D/g, ''), // Strip formatting for API
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle validation errors with details
+        if (data.details) {
+          const errorMessages = Object.entries(data.details)
+            .map(([field, messages]) => {
+              const fieldName = field.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
+              return `${fieldName}: ${(messages as string[]).join(', ')}`;
+            })
+            .join('\n');
+          throw new Error(errorMessages || data.error || "Registration failed");
+        }
         throw new Error(data.error || "Registration failed");
       }
 
@@ -74,16 +137,8 @@ export default function RegisterPage() {
     }
   };
 
-  const handleReset = () => {
-    setSuccess(null);
-    setFormData({
-      participant_number: "",
-      full_name: "",
-      email: "",
-      phone: "",
-      gender: "",
-    });
-  };
+  // handleReset function removed - "Register Another" button no longer needed
+  // Users can navigate back to registration page if they need to register another participant
 
   const handleGoToSelection = () => {
     if (!success) return;
@@ -127,64 +182,58 @@ export default function RegisterPage() {
 
             <CardContent>
               <div className="space-y-4 text-center">
+                {/* Display the assigned participant number prominently */}
                 <div>
+                  {/* Label for participant number */}
                   <p className="text-[#bfc0c0] mb-2">Your Participant Number</p>
+                  {/* Large, bold display of the participant number in brand color */}
                   <p className="text-4xl font-bold text-[#ef8354]">
                     #{success.participant_number}
                   </p>
+                  {/* Reminder text to help participant remember their number */}
                   <p className="text-sm text-[#bfc0c0]/70 mt-2">
                     Please remember this number
                   </p>
                 </div>
 
-                <div className="bg-white p-4 rounded-2xl inline-block">
-                  <Image
-                    src={success.qr_code}
-                    alt="Your QR Code"
-                    width={250}
-                    height={250}
-                    className="mx-auto"
-                  />
-                </div>
-
+                {/* Participant details section with dark background for contrast */}
                 <div className="text-left space-y-2 bg-gray-800 p-4 rounded-2xl">
+                  {/* Display participant name - capitalize first letter for proper formatting */}
                   <p className="text-sm text-gray-400">
                     <span className="font-semibold">Name:</span>{" "}
-                    {success.full_name}
+                    {/* Capitalize the first character of the full name */}
+                    {success.full_name.charAt(0).toUpperCase() + success.full_name.slice(1)}
                   </p>
+                  {/* Display participant email address */}
                   <p className="text-sm text-gray-400">
                     <span className="font-semibold">Email:</span>{" "}
                     {success.email}
                   </p>
                 </div>
 
+                {/* Next steps information box with blue theme */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 text-left">
+                  {/* Next steps header with icon */}
                   <p className="text-sm text-blue-300">
                     📱 <strong>Next Steps:</strong>
                   </p>
+                  {/* List of instructions for the participant */}
                   <ul className="text-sm text-blue-200 mt-2 space-y-1 ml-4">
-                    <li>• Save or screenshot this QR code</li>
-                    <li>• Bring it to the event</li>
+                    {/* Inform about background check process */}
                     <li>• Your background check status will be updated soon</li>
+                    {/* Instruction to use participant number for login */}
+                    <li>• Use your participant number to log in</li>
+                    {/* Remind to bring number to the event */}
+                    <li>• Bring your participant number to the event</li>
                   </ul>
                 </div>
 
+                {/* Action button section */}
                 <div className="space-y-3">
+                  {/* Primary action button to proceed to participant selection */}
                   <Button fullWidth onClick={handleGoToSelection}>
                     Start Selecting Participants
                   </Button>
-                  <div className="flex gap-3">
-                    <Button
-                      variant="secondary"
-                      fullWidth
-                      onClick={() => window.print()}
-                    >
-                      Print QR Code
-                    </Button>
-                    <Button variant="ghost" fullWidth onClick={handleReset}>
-                      Register Another
-                    </Button>
-                  </div>
                 </div>
               </div>
             </CardContent>
@@ -213,7 +262,7 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4">
-                  <p className="text-red-400 text-sm">{error}</p>
+                  <p className="text-red-400 text-sm whitespace-pre-line">{error}</p>
                 </div>
               )}
 

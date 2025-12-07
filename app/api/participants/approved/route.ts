@@ -5,18 +5,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { getCurrentParticipant } from '@/lib/auth/jwt';
 
 export async function GET(request: NextRequest) {
   try {
-    const participantId = request.headers.get('x-participant-id');
+    const participant = await getCurrentParticipant();
 
-    if (!participantId) {
+    if (!participant) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
+    const participantId = participant.participantId;
     const supabase = createServerClient();
 
     // Get all approved participants except the requesting participant

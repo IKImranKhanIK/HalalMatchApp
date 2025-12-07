@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { auth } from '@/lib/auth/auth';
+import { logParticipantUpdate, logParticipantDeletion } from '@/lib/utils/audit-log';
+import type { Database } from '@/types/database';
 
 export async function GET(
   request: NextRequest,
@@ -66,12 +68,14 @@ export async function PATCH(
       'phone',
       'gender',
       'background_check_status',
-    ];
+    ] as const;
 
-    const updates: Record<string, any> = {};
+    type ParticipantUpdate = Database['public']['Tables']['participants']['Update'];
+    const updates: ParticipantUpdate = {};
+
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
-        updates[field] = body[field];
+        (updates as any)[field] = body[field];
       }
     }
 
@@ -82,8 +86,10 @@ export async function PATCH(
       );
     }
 
-    // @ts-ignore - Supabase type inference issue
-    const { data: participant, error } = await supabase
+    // Supabase type inference has issues with dynamic updates, using type assertion
+    // The updates object is validated against allowedFields above
+    const supabaseUpdate: any = supabase;
+    const { data: participant, error } = await supabaseUpdate
       .from('participants')
       .update(updates)
       .eq('id', id)
@@ -97,6 +103,15 @@ export async function PATCH(
         { status: 500 }
       );
     }
+
+    // Audit log
+    await logParticipantUpdate(
+      session.user?.id as string,
+      session.user?.email || 'unknown',
+      id,
+      updates,
+      request
+    );
 
     return NextResponse.json({
       success: true,
@@ -126,10 +141,17 @@ export async function DELETE(
     const supabase = createServerClient();
 
     // First, delete all selections where this participant is involved
+    // Delete selections where this participant is the selector
     await supabase
       .from('interest_selections')
       .delete()
-      .or(`selector_id.eq.${id},selected_id.eq.${id}`);
+      .eq('selector_id', id);
+
+    // Delete selections where this participant is the selected
+    await supabase
+      .from('interest_selections')
+      .delete()
+      .eq('selected_id', id);
 
     // Then delete the participant
     const { error } = await supabase
@@ -144,6 +166,14 @@ export async function DELETE(
         { status: 500 }
       );
     }
+
+    // Audit log
+    await logParticipantDeletion(
+      session.user?.id as string,
+      session.user?.email || 'unknown',
+      id,
+      request
+    );
 
     return NextResponse.json({
       success: true,

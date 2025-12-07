@@ -5,8 +5,32 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { generateParticipantToken, setParticipantCookie } from '@/lib/auth/jwt';
+import { checkRateLimit, getClientIdentifier, RateLimitPresets } from '@/lib/utils/rate-limit';
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const identifier = getClientIdentifier(request);
+  const rateLimit = checkRateLimit(`participant-login:${identifier}`, RateLimitPresets.LOGIN);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      {
+        error: rateLimit.blocked
+          ? 'Too many login attempts. Please try again later.'
+          : 'Rate limit exceeded',
+      },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimit.limit.toString(),
+          'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+          'X-RateLimit-Reset': new Date(rateLimit.reset).toISOString(),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const { participant_number } = body;
@@ -21,7 +45,8 @@ export async function POST(request: NextRequest) {
     const supabase = createServerClient();
 
     // Find participant by number
-    const { data: participant, error } = await supabase
+    const supabaseAny: any = supabase;
+    const { data: participant, error } = await supabaseAny
       .from('participants')
       .select('id, participant_number, full_name, gender, background_check_status')
       .eq('participant_number', participant_number)
@@ -43,6 +68,17 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
+
+    // Generate JWT token
+    const token = await generateParticipantToken({
+      participantId: participant.id,
+      participantNumber: participant.participant_number,
+      gender: participant.gender,
+      fullName: participant.full_name,
+    });
+
+    // Set as httpOnly cookie
+    await setParticipantCookie(token);
 
     return NextResponse.json({
       success: true,

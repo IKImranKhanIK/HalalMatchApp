@@ -10,13 +10,39 @@ import {
   formatZodError,
 } from '@/lib/utils/validation';
 import { generateQRCode } from '@/lib/utils/qr-code';
+import { generateParticipantToken, setParticipantCookie } from '@/lib/auth/jwt';
+import { checkRateLimit, getClientIdentifier, RateLimitPresets } from '@/lib/utils/rate-limit';
+import { sanitizeParticipantData } from '@/lib/utils/sanitize';
 
 export async function POST(request: NextRequest) {
+  // Rate limiting
+  const identifier = getClientIdentifier(request);
+  const rateLimit = checkRateLimit(`participant-registration:${identifier}`, RateLimitPresets.REGISTRATION);
+
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      {
+        error: 'Too many registration attempts. Please try again later.',
+      },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': rateLimit.limit.toString(),
+          'X-RateLimit-Remaining': rateLimit.remaining.toString(),
+          'X-RateLimit-Reset': new Date(rateLimit.reset).toISOString(),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
 
+    // Sanitize input
+    const sanitizedBody = sanitizeParticipantData(body);
+
     // Validate input
-    const validation = participantRegistrationSchema.safeParse(body);
+    const validation = participantRegistrationSchema.safeParse(sanitizedBody);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -30,12 +56,13 @@ export async function POST(request: NextRequest) {
 
     const data = validation.data;
     const supabase = createServerClient();
+    const supabaseAny: any = supabase;
 
     // Get the default event (or specific event if provided)
     let eventId = data.event_id;
 
     if (!eventId) {
-      const { data: events, error: eventError } = await supabase
+      const { data: events, error: eventError } = await supabaseAny
         .from('events')
         .select('id')
         .eq('status', 'upcoming')
@@ -54,7 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for duplicate email in this event
-    const { data: existingEmail } = await supabase
+    const { data: existingEmail } = await supabaseAny
       .from('participants')
       .select('email')
       .eq('email', data.email)
@@ -69,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for duplicate participant number in this event
-    const { data: existingNumber } = await supabase
+    const { data: existingNumber } = await supabaseAny
       .from('participants')
       .select('participant_number')
       .eq('participant_number', data.participant_number)
@@ -84,7 +111,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert participant with provided participant_number
-    const { data: participant, error: insertError } = await supabase
+    const { data: participant, error: insertError } = await supabaseAny
       .from('participants')
       .insert({
         participant_number: data.participant_number,
@@ -114,7 +141,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Update participant with QR code
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAny
       .from('participants')
       .update({ qr_code_data: qrCodeData })
       .eq('id', participant.id);
@@ -123,6 +150,17 @@ export async function POST(request: NextRequest) {
       console.error('QR code update error:', updateError);
       // Non-fatal - participant is already created
     }
+
+    // Generate JWT token for automatic login
+    const token = await generateParticipantToken({
+      participantId: participant.id,
+      participantNumber: participant.participant_number,
+      gender: participant.gender,
+      fullName: participant.full_name,
+    });
+
+    // Set as httpOnly cookie
+    await setParticipantCookie(token);
 
     // Return success with participant data
     return NextResponse.json(

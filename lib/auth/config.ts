@@ -23,9 +23,10 @@ export const authConfig: NextAuthConfig = {
 
         try {
           const supabase = createServerClient();
+          const supabaseAny: any = supabase;
 
           // Fetch admin user by email
-          const { data: admin, error } = await supabase
+          const { data: admin, error } = await supabaseAny
             .from('admin_users')
             .select('id, email, password_hash, name, role')
             .eq('email', credentials.email)
@@ -81,6 +82,9 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: 'jwt',
+    maxAge: 24 * 60 * 60, // 24 hours
+    updateAge: 60 * 60, // Update session every hour
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // CSRF protection is enabled by default in NextAuth
 };

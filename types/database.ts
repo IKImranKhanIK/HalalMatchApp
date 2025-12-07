@@ -137,6 +137,44 @@ export interface Database {
           updated_at?: string
         }
       }
+      audit_logs: {
+        Row: {
+          id: string
+          action: string
+          actor_id: string
+          actor_email: string | null
+          resource_type: string | null
+          resource_id: string | null
+          details: Json | null
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          action: string
+          actor_id: string
+          actor_email?: string | null
+          resource_type?: string | null
+          resource_id?: string | null
+          details?: Json | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          action?: string
+          actor_id?: string
+          actor_email?: string | null
+          resource_type?: string | null
+          resource_id?: string | null
+          details?: Json | null
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       mutual_matches: {

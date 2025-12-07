@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
     const supabase = createServerClient();
 
     // Get all selections with participant details
-    const { data: selections, error } = await supabase
+    const supabaseAny: any = supabase;
+    const { data: selections, error } = await supabaseAny
       .from('interest_selections')
       .select(`
         id,
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate mutual matches
     const mutualMatches = new Set<string>();
-    const selectionsArray = selections || [];
+    const selectionsArray: any[] = selections || [];
 
     for (const selection of selectionsArray) {
       if (!selection.selector || !selection.selected) continue;

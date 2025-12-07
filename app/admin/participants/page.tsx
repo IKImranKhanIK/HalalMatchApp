@@ -19,6 +19,23 @@ interface Participant {
   created_at: string;
 }
 
+// Gender Icon Components
+const MaleIcon = () => (
+  <svg className="w-4 h-4 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M9.5,11c0,1.4,1.1,2.5,2.5,2.5s2.5-1.1,2.5-2.5S13.4,8.5,12,8.5S9.5,9.6,9.5,11z M19,4v3.5h-2V5.3l-2.8,2.8 c-0.8-0.6-1.8-1-2.9-1c-2.8,0-5,2.2-5,5s2.2,5,5,5s5-2.2,5-5c0-1.1-0.4-2.1-1-2.9L18.1,6h-2.3V4H19z"/>
+  </svg>
+);
+
+const FemaleIcon = () => (
+  <svg className="w-4 h-4 text-pink-400" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M12,2c-2.8,0-5,2.2-5,5s2.2,5,5,5s5-2.2,5-5S14.8,2,12,2z M12,10c-1.7,0-3-1.3-3-3s1.3-3,3-3s3,1.3,3,3 S13.7,10,12,10z M13,13.1V15h2v2h-2v3h-2v-3H9v-2h2v-1.9C8.2,12.6,6,10.2,6,7c0-3.3,2.7-6,6-6s6,2.7,6,6 C18,10.2,15.8,12.6,13,13.1z"/>
+  </svg>
+);
+
+const GenderIcon = ({ gender }: { gender: string }) => {
+  return gender === 'male' ? <MaleIcon /> : <FemaleIcon />;
+};
+
 export default function AdminParticipantsPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [filteredParticipants, setFilteredParticipants] = useState<
@@ -247,7 +264,12 @@ export default function AdminParticipantsPage() {
                       <td className="p-4 font-semibold">
                         {participant.participant_number}
                       </td>
-                      <td className="p-4">{participant.full_name}</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <GenderIcon gender={participant.gender} />
+                          <span>{participant.full_name}</span>
+                        </div>
+                      </td>
                       <td className="p-4 text-sm text-[#bfc0c0]">
                         {participant.email}
                       </td>
@@ -255,7 +277,10 @@ export default function AdminParticipantsPage() {
                         {participant.phone}
                       </td>
                       <td className="p-4 capitalize text-sm">
-                        {participant.gender}
+                        <div className="flex items-center gap-2">
+                          <GenderIcon gender={participant.gender} />
+                          <span>{participant.gender}</span>
+                        </div>
                       </td>
                       <td className="p-4">
                         {getStatusBadge(participant.background_check_status)}

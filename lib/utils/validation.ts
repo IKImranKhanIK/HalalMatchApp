@@ -13,7 +13,7 @@ export const participantRegistrationSchema = z.object({
   email: z.string().email('Invalid email address'),
   phone: z.string().min(10, 'Phone number must be at least 10 digits').max(20),
   gender: z.enum(['male', 'female'], {
-    errorMap: () => ({ message: 'Gender must be male or female' }),
+    message: 'Gender must be male or female',
   }),
   participant_number: z.number().int().positive('Participant number must be a positive number'),
   event_id: z.string().uuid().optional(),
@@ -26,7 +26,13 @@ export type ParticipantRegistrationInput = z.infer<typeof participantRegistratio
  */
 export const adminLoginSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z
+    .string()
+    .min(12, 'Password must be at least 12 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
 });
 
 export type AdminLoginInput = z.infer<typeof adminLoginSchema>;
@@ -57,7 +63,9 @@ export const updateParticipantSchema = z.object({
   full_name: z.string().min(2).max(255).optional(),
   email: z.string().email().optional(),
   phone: z.string().min(10).max(20).optional(),
-  gender: z.enum(['male', 'female']).optional(),
+  gender: z.enum(['male', 'female'], {
+    message: 'Gender must be male or female',
+  }).optional(),
   background_check_status: z.enum(['pending', 'approved', 'rejected']).optional(),
 });
 
@@ -92,7 +100,7 @@ export function validateData<T>(
 export function formatZodError(error: z.ZodError): Record<string, string[]> {
   const formatted: Record<string, string[]> = {};
 
-  error.errors.forEach((err) => {
+  error.issues.forEach((err) => {
     const path = err.path.join('.');
     if (!formatted[path]) {
       formatted[path] = [];

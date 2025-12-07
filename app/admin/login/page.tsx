@@ -109,16 +109,6 @@ function AdminLoginForm() {
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-
-            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-              <p className="text-sm text-blue-300 text-center">
-                <strong>Default credentials:</strong>
-                <br />
-                Email: admin@halalmatch.com
-                <br />
-                Password: admin123
-              </p>
-            </div>
           </CardContent>
         </Card>
 

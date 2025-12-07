@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true });
 
     // Get mutual matches count (selections where both participants selected each other)
-    const { data: mutualMatches } = await supabase
+    const supabaseAny: any = supabase;
+    const { data: mutualMatches } = await supabaseAny
       .from('interest_selections')
       .select(`
         id,
@@ -57,10 +58,10 @@ export async function GET(request: NextRequest) {
     const matchedPairs = new Set<string>();
 
     if (mutualMatches) {
-      for (const selection of mutualMatches) {
+      for (const selection of mutualMatches as any[]) {
         // Check if reverse selection exists
-        const reverseExists = mutualMatches.find(
-          (s) =>
+        const reverseExists = (mutualMatches as any[]).find(
+          (s: any) =>
             s.selector_id === selection.selected_id &&
             s.selected_id === selection.selector_id
         );

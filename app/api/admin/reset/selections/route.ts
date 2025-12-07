@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import { auth } from '@/lib/auth/auth';
+import { logDatabaseReset } from '@/lib/utils/audit-log';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,14 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Audit log
+    await logDatabaseReset(
+      session.user?.id as string,
+      session.user?.email || 'unknown',
+      'selections',
+      request
+    );
 
     return NextResponse.json({
       success: true,

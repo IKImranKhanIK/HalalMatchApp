@@ -209,7 +209,7 @@ export default function AdminDashboardPage() {
         <StatsCard
           title="Mutual Matches"
           value={stats.mutualMatches}
-          color="purple"
+          color="green"
           icon={
             <svg
               className="w-6 h-6"
