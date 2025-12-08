@@ -159,6 +159,49 @@
 
 ---
 
+### 7. Professional Excel Export with Mailto Links
+
+**Location**: `/admin/dashboard` (Export Data section)
+
+**Features**:
+- **Branded Styling**: Headers in app's signature orange (#EF8354)
+- **Color-Coded Data**:
+  - Green highlights (#10B981) for mutual matches
+  - Blue clickable links (#4F8EF7) for email actions
+  - Professional borders and alignment
+- **Two-Sheet Workbook**:
+  - "Selections": Complete list of all selections
+  - "Mutual Matches ❤️": Dedicated sheet for matched pairs
+- **One-Click Email**:
+  - Clickable "Email Both" button in Excel
+  - Pre-filled subject: "Congratulations - It's a Match!"
+  - Islamic greeting in email body
+  - Both participants' emails included
+- **Professional Formatting**:
+  - Frozen header rows for easy scrolling
+  - Optimized column widths (10-25 characters)
+  - Bold white text on colored backgrounds
+  - Clean borders throughout
+- **Dual Format Support**:
+  - Default: Styled Excel (.xlsx)
+  - Legacy: CSV export via `?format=csv`
+
+**Technical**:
+- Uses XLSX library's cell styling API
+- RGB color codes matching app theme
+- Hyperlinks using XLSX link format
+- Cell-level formatting with fills, fonts, borders
+- Maintains backward compatibility
+
+**Benefits**:
+- Email matched pairs directly from Excel with one click
+- Professional appearance for stakeholders and donors
+- Easy identification of mutual matches at a glance
+- Streamlined communication workflow
+- No need to copy-paste email addresses manually
+
+---
+
 ## 📊 Impact Summary
 
 | Metric | Before | After | Improvement |
@@ -168,6 +211,8 @@
 | Participant search | Basic | Multi-criteria | Much more powerful |
 | Admin UX | Browser dialogs | Custom modals | Professional |
 | Data insights | Text stats only | Visual charts | Better understanding |
+| Excel export | Bland CSV | Styled Excel + mailto | Professional & functional |
+| Time to email matches | Manual copy-paste | One-click | Instant |
 
 ---
 
@@ -179,25 +224,27 @@
    - Upload profile photos during registration
    - Display in selection interface
    - Show thumbnails in admin panel
+   - Include in Excel export
    - Estimated effort: 4-6 hours
 
-2. **Enhanced Excel Export** (Medium Impact)
-   - Export to Excel with formatting
-   - Include participant photos
-   - Printable match cards
-   - Multiple sheet workbooks
-   - Estimated effort: 2-3 hours
-
-3. **Email Notifications** (High Impact)
-   - Notify participants of matches
+2. **Email Notifications** (High Impact)
+   - Notify participants of matches automatically
    - Background check status updates
    - Event reminders
+   - Integration with mailto links from Excel
    - Estimated effort: 3-4 hours
 
-4. **SMS Integration** (Medium Impact)
+3. **SMS Integration** (Medium Impact)
    - SMS notifications for critical updates
    - Two-factor authentication
    - Event day check-in codes
+   - Estimated effort: 3-4 hours
+
+4. **Printable Match Cards** (Medium Impact)
+   - PDF generation for matched pairs
+   - Include participant photos
+   - Branded design with QR codes
+   - Ready to distribute at events
    - Estimated effort: 3-4 hours
 
 5. **Advanced Analytics** (Low Priority)
@@ -224,6 +271,7 @@
 - `/app/admin/dashboard/page.tsx` - Analytics + auto-refresh
 - `/app/register/page.tsx` - Age and occupation fields
 - `/lib/utils/validation.ts` - Updated schemas
+- `/app/api/admin/export/route.ts` - Professional Excel export with styling and mailto links
 
 ### Database Changes Required:
 ```sql
@@ -250,6 +298,13 @@ All features have been committed with detailed messages:
    - Real-time auto-refresh every 30 seconds
    - Live indicator and last updated timestamp
    - Responsive chart layouts
+
+3. **`feat: Enhance Excel export with professional styling and mailto links`**
+   - Branded styling with app colors (#EF8354, #10B981, #4F8EF7)
+   - Two-sheet workbook: "Selections" and "Mutual Matches ❤️"
+   - Clickable mailto links to email matched pairs
+   - Pre-filled email templates with Islamic greeting
+   - Professional formatting with frozen headers and optimized columns
 
 ---
 
