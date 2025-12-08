@@ -3,342 +3,82 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
-import Select from "@/components/ui/Select";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import ErrorMessage from "@/components/shared/ErrorMessage";
 
-interface Participant {
+interface Event {
   id: string;
-  participant_number: number;
-  full_name: string;
-  email: string;
-  gender: string;
-  age?: number;
-  occupation?: string;
-  background_check_status: string;
+  name: string;
+  date: string;
+  location: string;
+  description: string;
+  status: string;
   created_at: string;
 }
 
-interface Selection {
-  id: string;
-  created_at: string;
-  is_mutual: boolean;
-  selector: {
-    participant_number: number;
-    full_name: string;
-    gender: string;
-  };
-  selected: {
-    participant_number: number;
-    full_name: string;
-    gender: string;
-  };
-}
-
-interface HistoryEvent {
-  id: string;
-  type: "registration" | "selection" | "mutual_match";
-  timestamp: string;
-  data: any;
+interface EventWithStats extends Event {
+  participantCount: number;
+  selectionCount: number;
+  mutualMatchCount: number;
+  maleCount: number;
+  femaleCount: number;
 }
 
 export default function AdminHistoryPage() {
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [selections, setSelections] = useState<Selection[]>([]);
-  const [historyEvents, setHistoryEvents] = useState<HistoryEvent[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<HistoryEvent[]>([]);
+  const [events, setEvents] = useState<EventWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [eventTypeFilter, setEventTypeFilter] = useState("all");
-  const [dateRangeFilter, setDateRangeFilter] = useState("all");
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
+    fetchEvents();
   }, []);
 
-  useEffect(() => {
-    filterEvents();
-  }, [historyEvents, searchTerm, eventTypeFilter, dateRangeFilter]);
-
-  const fetchData = async () => {
+  const fetchEvents = async () => {
     try {
       setLoading(true);
       setError("");
 
-      // Fetch participants and selections in parallel
-      const [participantsRes, selectionsRes] = await Promise.all([
-        fetch("/api/admin/participants"),
-        fetch("/api/admin/selections"),
-      ]);
+      // Fetch all events
+      const eventsResponse = await fetch("/api/admin/events");
+      if (!eventsResponse.ok) throw new Error("Failed to fetch events");
 
-      if (!participantsRes.ok || !selectionsRes.ok) {
-        throw new Error("Failed to fetch data");
-      }
-
-      const participantsData = await participantsRes.json();
-      const selectionsData = await selectionsRes.json();
-
-      setParticipants(participantsData.participants || []);
-      setSelections(selectionsData.selections || []);
-
-      // Build history events
-      buildHistoryEvents(
-        participantsData.participants || [],
-        selectionsData.selections || []
-      );
+      const eventsData = await eventsResponse.json();
+      setEvents(eventsData.events || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load history");
+      setError(err instanceof Error ? err.message : "Failed to load events");
     } finally {
       setLoading(false);
     }
   };
 
-  const buildHistoryEvents = (
-    participants: Participant[],
-    selections: Selection[]
-  ) => {
-    const events: HistoryEvent[] = [];
-
-    // Add registration events
-    participants.forEach((p) => {
-      events.push({
-        id: `reg-${p.id}`,
-        type: "registration",
-        timestamp: p.created_at,
-        data: p,
-      });
-    });
-
-    // Add selection events
-    selections.forEach((s) => {
-      if (s.is_mutual) {
-        events.push({
-          id: `match-${s.id}`,
-          type: "mutual_match",
-          timestamp: s.created_at,
-          data: s,
-        });
-      } else {
-        events.push({
-          id: `sel-${s.id}`,
-          type: "selection",
-          timestamp: s.created_at,
-          data: s,
-        });
-      }
-    });
-
-    // Sort by timestamp (newest first)
-    events.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-
-    setHistoryEvents(events);
-  };
-
-  const filterEvents = () => {
-    let filtered = [...historyEvents];
-
-    // Filter by event type
-    if (eventTypeFilter !== "all") {
-      filtered = filtered.filter((e) => e.type === eventTypeFilter);
-    }
-
-    // Filter by date range
-    if (dateRangeFilter !== "all") {
-      const now = new Date();
-      const filterDate = new Date();
-
-      switch (dateRangeFilter) {
-        case "today":
-          filterDate.setHours(0, 0, 0, 0);
-          break;
-        case "week":
-          filterDate.setDate(now.getDate() - 7);
-          break;
-        case "month":
-          filterDate.setMonth(now.getMonth() - 1);
-          break;
-      }
-
-      filtered = filtered.filter(
-        (e) => new Date(e.timestamp) >= filterDate
-      );
-    }
-
-    // Search
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter((e) => {
-        if (e.type === "registration") {
-          const p = e.data as Participant;
-          return (
-            p.full_name.toLowerCase().includes(term) ||
-            p.email.toLowerCase().includes(term) ||
-            p.participant_number.toString().includes(term)
-          );
-        } else {
-          const s = e.data as Selection;
-          return (
-            s.selector.full_name.toLowerCase().includes(term) ||
-            s.selected.full_name.toLowerCase().includes(term) ||
-            s.selector.participant_number.toString().includes(term) ||
-            s.selected.participant_number.toString().includes(term)
-          );
-        }
-      });
-    }
-
-    setFilteredEvents(filtered);
-  };
-
-  const getEventIcon = (type: string) => {
-    switch (type) {
-      case "registration":
-        return (
-          <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-green-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-              />
-            </svg>
-          </div>
-        );
-      case "selection":
-        return (
-          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 8l4 4m0 0l-4 4m4-4H3"
-              />
-            </svg>
-          </div>
-        );
-      case "mutual_match":
-        return (
-          <div className="w-10 h-10 rounded-full bg-pink-500/20 flex items-center justify-center">
-            <svg
-              className="w-5 h-5 text-pink-400"
-              fill="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-            </svg>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
-      month: "short",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
       day: "numeric",
-      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
     });
   };
 
-  const renderEventContent = (event: HistoryEvent) => {
-    switch (event.type) {
-      case "registration": {
-        const p = event.data as Participant;
-        return (
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold">New Registration</h3>
-              <span
-                className={`px-2 py-0.5 rounded text-xs font-medium ${
-                  p.background_check_status === "approved"
-                    ? "bg-green-500/10 text-green-400"
-                    : p.background_check_status === "rejected"
-                    ? "bg-red-500/10 text-red-400"
-                    : "bg-yellow-500/10 text-yellow-400"
-                }`}
-              >
-                {p.background_check_status}
-              </span>
-            </div>
-            <p className="text-sm text-[#bfc0c0]">
-              <span className="font-medium text-white">#{p.participant_number}</span> -{" "}
-              {p.full_name} ({p.gender}, {p.age || "N/A"})
-            </p>
-            <p className="text-xs text-[#bfc0c0] mt-1">
-              {p.email} • {p.occupation || "N/A"}
-            </p>
-          </div>
-        );
-      }
-      case "selection": {
-        const s = event.data as Selection;
-        return (
-          <div>
-            <h3 className="font-semibold mb-1">New Selection</h3>
-            <p className="text-sm text-[#bfc0c0]">
-              <span className="font-medium text-white">
-                #{s.selector.participant_number} {s.selector.full_name}
-              </span>{" "}
-              selected{" "}
-              <span className="font-medium text-white">
-                #{s.selected.participant_number} {s.selected.full_name}
-              </span>
-            </p>
-          </div>
-        );
-      }
-      case "mutual_match": {
-        const s = event.data as Selection;
-        return (
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="font-semibold text-pink-400">🎉 Mutual Match!</h3>
-            </div>
-            <p className="text-sm text-[#bfc0c0]">
-              <span className="font-medium text-white">
-                #{s.selector.participant_number} {s.selector.full_name}
-              </span>{" "}
-              ↔️{" "}
-              <span className="font-medium text-white">
-                #{s.selected.participant_number} {s.selected.full_name}
-              </span>
-            </p>
-          </div>
-        );
-      }
-      default:
-        return null;
-    }
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      completed: "bg-green-500/20 text-green-400 border-green-500/30",
+      ongoing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+      upcoming: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+      cancelled: "bg-red-500/20 text-red-400 border-red-500/30",
+    };
+
+    return (
+      <span
+        className={`px-3 py-1 rounded-full text-xs font-medium border ${
+          styles[status as keyof typeof styles] || styles.upcoming
+        }`}
+      >
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </span>
+    );
   };
 
   if (loading) {
@@ -352,17 +92,48 @@ export default function AdminHistoryPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold">History & Activity Log</h1>
-        <p className="text-[#bfc0c0] mt-1">
-          Complete timeline of all registrations, selections, and matches
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Event History</h1>
+          <p className="text-[#bfc0c0] mt-1">
+            View all past and upcoming matchmaking events
+          </p>
+        </div>
+        <Button onClick={() => window.location.href = "/admin/events"}>
+          Manage Events
+        </Button>
       </div>
 
-      {error && <ErrorMessage message={error} onRetry={fetchData} />}
+      {error && <ErrorMessage message={error} onRetry={fetchEvents} />}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Summary Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <svg
+                  className="w-6 h-6 text-blue-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm text-[#bfc0c0]">Total Events</p>
+                <p className="text-2xl font-bold">{events.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -382,8 +153,10 @@ export default function AdminHistoryPage() {
                 </svg>
               </div>
               <div>
-                <p className="text-sm text-[#bfc0c0]">Total Registrations</p>
-                <p className="text-2xl font-bold">{participants.length}</p>
+                <p className="text-sm text-[#bfc0c0]">Total Participants</p>
+                <p className="text-2xl font-bold">
+                  {events.reduce((sum, e) => sum + e.participantCount, 0)}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -392,9 +165,9 @@ export default function AdminHistoryPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
                 <svg
-                  className="w-6 h-6 text-blue-400"
+                  className="w-6 h-6 text-purple-400"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -409,7 +182,9 @@ export default function AdminHistoryPage() {
               </div>
               <div>
                 <p className="text-sm text-[#bfc0c0]">Total Selections</p>
-                <p className="text-2xl font-bold">{selections.length}</p>
+                <p className="text-2xl font-bold">
+                  {events.reduce((sum, e) => sum + e.selectionCount, 0)}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -428,9 +203,9 @@ export default function AdminHistoryPage() {
                 </svg>
               </div>
               <div>
-                <p className="text-sm text-[#bfc0c0]">Mutual Matches</p>
+                <p className="text-sm text-[#bfc0c0]">Total Matches</p>
                 <p className="text-2xl font-bold">
-                  {selections.filter((s) => s.is_mutual).length}
+                  {events.reduce((sum, e) => sum + e.mutualMatchCount, 0)}
                 </p>
               </div>
             </div>
@@ -438,85 +213,170 @@ export default function AdminHistoryPage() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Search"
-              placeholder="Search by name, email, or number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <Select
-              label="Event Type"
-              value={eventTypeFilter}
-              onChange={(e) => setEventTypeFilter(e.target.value)}
-              options={[
-                { value: "all", label: "All Events" },
-                { value: "registration", label: "Registrations" },
-                { value: "selection", label: "Selections" },
-                { value: "mutual_match", label: "Mutual Matches" },
-              ]}
-            />
-            <Select
-              label="Time Period"
-              value={dateRangeFilter}
-              onChange={(e) => setDateRangeFilter(e.target.value)}
-              options={[
-                { value: "all", label: "All Time" },
-                { value: "today", label: "Today" },
-                { value: "week", label: "Last 7 Days" },
-                { value: "month", label: "Last 30 Days" },
-              ]}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Results Count */}
-      <div className="text-sm text-[#bfc0c0]">
-        Showing {filteredEvents.length} of {historyEvents.length} events
-      </div>
-
-      {/* Timeline */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Activity Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredEvents.length === 0 ? (
-            <div className="text-center py-12">
+      {/* Events List */}
+      <div className="space-y-4">
+        {events.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
               <p className="text-[#bfc0c0]">No events found</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredEvents.map((event, index) => (
-                <div key={event.id} className="flex gap-4">
-                  {/* Timeline dot */}
-                  <div className="relative flex flex-col items-center">
-                    {getEventIcon(event.type)}
-                    {index < filteredEvents.length - 1 && (
-                      <div className="w-0.5 h-full bg-[#4f5d75] mt-2"></div>
-                    )}
-                  </div>
-
-                  {/* Event content */}
-                  <div className="flex-1 pb-8">
-                    <div className="bg-[#2b2d42] p-4 rounded-xl border border-[#4f5d75] hover:border-[#8d99ae] transition-colors">
-                      {renderEventContent(event)}
-                      <p className="text-xs text-[#bfc0c0] mt-2">
-                        {formatTimestamp(event.timestamp)} •{" "}
-                        {new Date(event.timestamp).toLocaleString()}
+              <Button
+                className="mt-4"
+                onClick={() => window.location.href = "/admin/events"}
+              >
+                Create First Event
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          events.map((event) => (
+            <Card key={event.id} className="overflow-hidden">
+              <div
+                className="p-6 cursor-pointer hover:bg-[#3d4457] transition-colors"
+                onClick={() =>
+                  setExpandedEvent(expandedEvent === event.id ? null : event.id)
+                }
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h2 className="text-2xl font-bold">{event.name}</h2>
+                      {getStatusBadge(event.status)}
+                    </div>
+                    <div className="flex items-center gap-6 text-[#bfc0c0] text-sm mb-3">
+                      <div className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                        <span className="font-medium">{formatDate(event.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        <span>{event.location}</span>
+                      </div>
+                    </div>
+                    {event.description && (
+                      <p className="text-[#bfc0c0] text-sm mb-4">
+                        {event.description}
                       </p>
+                    )}
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="bg-[#2b2d42] p-3 rounded-lg">
+                        <p className="text-xs text-[#bfc0c0] mb-1">Participants</p>
+                        <p className="text-xl font-bold">{event.participantCount}</p>
+                        <p className="text-xs text-[#bfc0c0] mt-1">
+                          {event.maleCount}M / {event.femaleCount}F
+                        </p>
+                      </div>
+                      <div className="bg-[#2b2d42] p-3 rounded-lg">
+                        <p className="text-xs text-[#bfc0c0] mb-1">Selections</p>
+                        <p className="text-xl font-bold">{event.selectionCount}</p>
+                      </div>
+                      <div className="bg-[#2b2d42] p-3 rounded-lg">
+                        <p className="text-xs text-[#bfc0c0] mb-1">Matches</p>
+                        <p className="text-xl font-bold text-pink-400">
+                          {event.mutualMatchCount}
+                        </p>
+                      </div>
+                      <div className="bg-[#2b2d42] p-3 rounded-lg">
+                        <p className="text-xs text-[#bfc0c0] mb-1">Success Rate</p>
+                        <p className="text-xl font-bold text-green-400">
+                          {event.selectionCount > 0
+                            ? ((event.mutualMatchCount / event.selectionCount) * 100).toFixed(0)
+                            : 0}
+                          %
+                        </p>
+                      </div>
                     </div>
                   </div>
+
+                  <div className="ml-4">
+                    <svg
+                      className={`w-6 h-6 text-[#bfc0c0] transition-transform ${
+                        expandedEvent === event.id ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+
+              {/* Expanded Details */}
+              {expandedEvent === event.id && (
+                <div className="border-t border-[#4f5d75] p-6 bg-[#2b2d42]">
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        window.location.href = `/admin/participants?event=${event.id}`
+                      }
+                    >
+                      View Participants
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        window.location.href = `/admin/selections?event=${event.id}`
+                      }
+                    >
+                      View Selections
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        // Export event data
+                        window.location.href = `/api/admin/export?event=${event.id}`;
+                      }}
+                    >
+                      Export Event Data
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 }
