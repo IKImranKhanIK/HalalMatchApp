@@ -319,14 +319,103 @@ export default function AdminParticipantsPage() {
     );
   }
 
+  // Quick Action: Select all pending
+  const selectAllPending = () => {
+    const pendingIds = filteredParticipants
+      .filter((p) => p.background_check_status === "pending")
+      .map((p) => p.id);
+    setSelectedParticipants(new Set(pendingIds));
+  };
+
+  // Quick Action: Approve all pending (one-click)
+  const approveAllPending = () => {
+    const pendingParticipants = participants.filter(
+      (p) => p.background_check_status === "pending"
+    );
+
+    if (pendingParticipants.length === 0) {
+      setToast({
+        message: "No pending participants to approve",
+        type: "info",
+      });
+      return;
+    }
+
+    setConfirmDialog({
+      isOpen: true,
+      title: `Approve All ${pendingParticipants.length} Pending Participant(s)?`,
+      message: `This will approve all pending participants in one action. Are you sure?`,
+      variant: "info",
+      onConfirm: async () => {
+        try {
+          setBulkUpdating(true);
+          setConfirmDialog(null);
+
+          const updatePromises = pendingParticipants.map((p) =>
+            fetch(`/api/admin/participants/${p.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ background_check_status: "approved" }),
+            })
+          );
+
+          await Promise.all(updatePromises);
+
+          setParticipants((prev) =>
+            prev.map((p) =>
+              p.background_check_status === "pending"
+                ? { ...p, background_check_status: "approved" }
+                : p
+            )
+          );
+
+          setToast({
+            message: `Successfully approved ${pendingParticipants.length} participant(s)`,
+            type: "success",
+          });
+        } catch (err) {
+          setToast({
+            message: err instanceof Error ? err.message : "Failed to approve participants",
+            type: "error",
+          });
+        } finally {
+          setBulkUpdating(false);
+        }
+      },
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Participants</h1>
-        <p className="text-[#bfc0c0] mt-1">
-          Manage participant registrations and background checks
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Participants</h1>
+          <p className="text-[#bfc0c0] mt-1">
+            Manage participant registrations and background checks
+          </p>
+        </div>
+        {/* Quick Actions */}
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={selectAllPending}
+            disabled={bulkUpdating || filteredParticipants.filter((p) => p.background_check_status === "pending").length === 0}
+            title="Select all pending participants"
+          >
+            Select All Pending
+          </Button>
+          <Button
+            size="sm"
+            onClick={approveAllPending}
+            disabled={bulkUpdating || participants.filter((p) => p.background_check_status === "pending").length === 0}
+            loading={bulkUpdating}
+            title="Approve all pending participants with one click"
+          >
+            ✓ Approve All Pending
+          </Button>
+        </div>
       </div>
 
       {error && (
