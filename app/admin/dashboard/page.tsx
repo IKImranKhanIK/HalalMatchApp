@@ -9,6 +9,7 @@ import ErrorMessage from "@/components/shared/ErrorMessage";
 import StatsCard from "@/components/admin/StatsCard";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Toast from "@/components/ui/Toast";
+import AnalyticsCharts from "@/components/admin/AnalyticsCharts";
 
 interface DashboardStats {
   totalParticipants: number;
@@ -34,34 +35,87 @@ interface ToastState {
   type: "success" | "error" | "info";
 }
 
+interface Participant {
+  gender: string;
+  age?: number;
+  background_check_status: string;
+  occupation?: string;
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [resetting, setResetting] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     fetchStats();
   }, []);
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
+  // Force re-render every second to update "Last updated" time
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick((tick) => tick + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate time since last update
+  const getTimeSinceUpdate = () => {
+    const seconds = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return `${seconds} seconds ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+  };
 
   const fetchStats = async () => {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch("/api/admin/stats");
+      // Fetch stats and participants in parallel
+      const [statsResponse, participantsResponse] = await Promise.all([
+        fetch("/api/admin/stats"),
+        fetch("/api/admin/participants"),
+      ]);
 
-      if (!response.ok) {
+      if (!statsResponse.ok) {
         throw new Error("Failed to fetch stats");
       }
 
-      const data = await response.json();
-      setStats(data.stats);
+      if (!participantsResponse.ok) {
+        throw new Error("Failed to fetch participants");
+      }
+
+      const statsData = await statsResponse.json();
+      const participantsData = await participantsResponse.json();
+
+      setStats(statsData.stats);
+      setParticipants(participantsData.participants || []);
+      setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load stats");
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -169,12 +223,49 @@ export default function AdminDashboardPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-[#bfc0c0] mt-1">
-            Overview of participant registration and selections
-          </p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            {autoRefresh && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-green-400 text-sm font-medium">Live</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-4 mt-1">
+            <p className="text-[#bfc0c0]">
+              Overview of participant registration and selections
+            </p>
+            <span className="text-[#bfc0c0] text-sm">
+              Last updated: {getTimeSinceUpdate()}
+            </span>
+          </div>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className="flex items-center gap-2"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={
+                  autoRefresh
+                    ? "M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    : "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                }
+              />
+            </svg>
+            {autoRefresh ? "Pause" : "Resume"}
+          </Button>
           <Button
             variant="secondary"
             onClick={() => router.push("/admin/participants")}
@@ -359,6 +450,23 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Analytics & Insights */}
+      {participants.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">Analytics & Insights</h2>
+            <p className="text-[#bfc0c0] mt-1">
+              Visual breakdown of participant demographics and status
+            </p>
+          </div>
+          <Card>
+            <CardContent className="py-6">
+              <AnalyticsCharts participants={participants} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Info Cards */}
       {stats.pendingChecks > 0 && (
