@@ -53,18 +53,56 @@ export default function AdminSelectionsPage() {
   const [mutualMatchesCount, setMutualMatchesCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [viewMode, setViewMode] = useState<"selections" | "by-participant">("selections");
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [newSelectionIds, setNewSelectionIds] = useState<Set<string>>(new Set());
+  const [recentSelections, setRecentSelections] = useState<Selection[]>([]);
 
   useEffect(() => {
-    fetchSelections();
+    fetchSelections(false); // Initial load
   }, []);
 
   useEffect(() => {
     filterSelections();
   }, [selections, showMutualOnly]);
 
-  const fetchSelections = async () => {
+  // Auto-refresh effect - every 10 seconds for real-time feel
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchSelections(true); // Silent background refresh
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh]);
+
+  // Force re-render every second to update "time ago"
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick((tick) => tick + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate time since last update
+  const getTimeSinceUpdate = () => {
+    const seconds = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  };
+
+  const fetchSelections = async (silent = false) => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load
+      if (!silent) {
+        setLoading(true);
+      }
       setError("");
 
       const response = await fetch("/api/admin/selections");
@@ -74,13 +112,37 @@ export default function AdminSelectionsPage() {
       }
 
       const data = await response.json();
-      setSelections(data.selections || []);
+      const newSelections = data.selections || [];
+
+      // Detect new selections by comparing IDs
+      if (silent && selections.length > 0) {
+        const existingIds = new Set(selections.map(s => s.id));
+        const newIds = newSelections
+          .filter((s: Selection) => !existingIds.has(s.id))
+          .map((s: Selection) => s.id);
+
+        if (newIds.length > 0) {
+          setNewSelectionIds(new Set(newIds));
+          // Clear the "new" highlight after 5 seconds
+          setTimeout(() => {
+            setNewSelectionIds(new Set());
+          }, 5000);
+        }
+      }
+
+      setSelections(newSelections);
+      setRecentSelections(newSelections.slice(0, 10)); // Top 10 most recent
       setTotalCount(data.total || 0);
       setMutualMatchesCount(data.mutualMatchesCount || 0);
+      setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load selections");
+      if (!silent) {
+        setError(err instanceof Error ? err.message : "Failed to load selections");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -168,12 +230,71 @@ export default function AdminSelectionsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold">Selections & Matches</h1>
-          <p className="text-[#bfc0c0] mt-1">
-            View all participant selections and identify mutual matches
-          </p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold">Selections & Matches</h1>
+            {autoRefresh && (
+              <div
+                className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full"
+                title="Auto-refreshes every 10 seconds to show new selections"
+              >
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-green-400 text-sm font-medium">Live</span>
+                <span className="text-green-400/60 text-xs ml-0.5">(10s)</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-4 mt-1">
+            <p className="text-[#bfc0c0]">
+              View all participant selections and identify mutual matches
+            </p>
+            <span className="text-[#bfc0c0] text-xs flex items-center gap-1.5">
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Updated {getTimeSinceUpdate()}
+            </span>
+          </div>
         </div>
         <div className="flex gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className="flex items-center gap-2"
+            title={
+              autoRefresh
+                ? "Pause live updates"
+                : "Resume live updates"
+            }
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={
+                  autoRefresh
+                    ? "M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    : "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                }
+              />
+            </svg>
+            {autoRefresh ? "Pause" : "Resume"}
+          </Button>
           <div className="flex gap-2 bg-gray-800 p-1 rounded-lg">
             <button
               onClick={() => setViewMode("selections")}
@@ -202,7 +323,7 @@ export default function AdminSelectionsPage() {
         </div>
       </div>
 
-      {error && <ErrorMessage message={error} onRetry={fetchSelections} />}
+      {error && <ErrorMessage message={error} onRetry={() => fetchSelections(false)} />}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -232,6 +353,127 @@ export default function AdminSelectionsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Live Activity Feed */}
+      {recentSelections.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CardTitle>🔥 Live Activity Feed</CardTitle>
+                {autoRefresh && (
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                )}
+              </div>
+              <span className="text-sm text-[#bfc0c0]">
+                Last {recentSelections.length} selections
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recentSelections.map((selection, index) => {
+                const isNew = newSelectionIds.has(selection.id);
+                const timeAgo = (() => {
+                  const seconds = Math.floor((new Date().getTime() - new Date(selection.created_at).getTime()) / 1000);
+                  if (seconds < 60) return `${seconds}s ago`;
+                  const minutes = Math.floor(seconds / 60);
+                  if (minutes < 60) return `${minutes}m ago`;
+                  const hours = Math.floor(minutes / 60);
+                  if (hours < 24) return `${hours}h ago`;
+                  return new Date(selection.created_at).toLocaleDateString();
+                })();
+
+                return (
+                  <div
+                    key={selection.id}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-500 ${
+                      isNew
+                        ? "bg-green-500/10 border-green-500/50 animate-in slide-in-from-right-5 shadow-lg shadow-green-500/20"
+                        : selection.is_mutual
+                        ? "bg-green-500/5 border-green-500/20 hover:bg-green-500/10"
+                        : "bg-gray-800/50 border-gray-700 hover:bg-gray-800"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="flex items-center gap-2 min-w-[180px]">
+                        <GenderIcon gender={selection.selector.gender} />
+                        <div>
+                          <p className="font-semibold text-sm">
+                            #{selection.selector.participant_number}
+                          </p>
+                          <p className="text-xs text-[#bfc0c0]">
+                            {selection.selector.full_name}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <svg
+                          className={`w-5 h-5 ${
+                            selection.is_mutual ? "text-green-400" : "text-gray-500"
+                          }`}
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M17 8l4 4m0 0l-4 4m4-4H3"
+                          />
+                        </svg>
+                        {selection.is_mutual && (
+                          <svg
+                            className="w-5 h-5 text-green-400 animate-pulse"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 min-w-[180px]">
+                        <GenderIcon gender={selection.selected.gender} />
+                        <div>
+                          <p className="font-semibold text-sm">
+                            #{selection.selected.participant_number}
+                          </p>
+                          <p className="text-xs text-[#bfc0c0]">
+                            {selection.selected.full_name}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-[#bfc0c0] whitespace-nowrap">
+                        {timeAgo}
+                      </span>
+                      {selection.is_mutual ? (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-500 text-white shadow-lg shadow-green-500/30 animate-pulse">
+                          ✓ MATCH!
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-700 text-gray-400">
+                          One-way
+                        </span>
+                      )}
+                      {isNew && (
+                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-orange-500 text-white animate-bounce">
+                          NEW
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters - Only show for selections view */}
       {viewMode === "selections" && (
