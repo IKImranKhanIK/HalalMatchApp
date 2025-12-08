@@ -176,53 +176,117 @@ export async function GET(request: NextRequest) {
       { wch: 12 },  // Date
     ];
 
-    // App colors: #ef8354 (orange), #2d3142 (dark blue), #4f5d75 (gray)
+    // Beautiful color scheme
     const headerStyle = {
-      fill: { fgColor: { rgb: 'EF8354' } },
-      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 12 },
-      alignment: { horizontal: 'center', vertical: 'center' },
+      fill: { fgColor: { rgb: 'EF8354' } }, // Vibrant orange
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13, name: 'Calibri' },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
       border: {
-        top: { style: 'thin', color: { rgb: '000000' } },
-        bottom: { style: 'thin', color: { rgb: '000000' } },
-        left: { style: 'thin', color: { rgb: '000000' } },
-        right: { style: 'thin', color: { rgb: '000000' } },
+        top: { style: 'medium', color: { rgb: '2D3142' } },
+        bottom: { style: 'medium', color: { rgb: '2D3142' } },
+        left: { style: 'thin', color: { rgb: '2D3142' } },
+        right: { style: 'thin', color: { rgb: '2D3142' } },
       },
     };
 
-    const mutualMatchStyle = {
-      fill: { fgColor: { rgb: '10B981' } },
-      font: { bold: true, color: { rgb: 'FFFFFF' } },
-      alignment: { horizontal: 'center' },
+    const mutualMatchYesStyle = {
+      fill: { fgColor: { rgb: '10B981' } }, // Emerald green
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        bottom: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        left: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        right: { style: 'thin', color: { rgb: 'DDDDDD' } },
+      },
+    };
+
+    const mutualMatchNoStyle = {
+      fill: { fgColor: { rgb: 'FEE2E2' } }, // Light red
+      font: { color: { rgb: 'DC2626' }, sz: 10 },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        bottom: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        left: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        right: { style: 'thin', color: { rgb: 'DDDDDD' } },
+      },
     };
 
     const emailLinkStyle = {
-      fill: { fgColor: { rgb: '4F8EF7' } },
-      font: { color: { rgb: 'FFFFFF' }, underline: true },
-      alignment: { horizontal: 'center' },
+      fill: { fgColor: { rgb: '3B82F6' } }, // Blue
+      font: { color: { rgb: 'FFFFFF' }, underline: true, bold: true, sz: 10 },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        bottom: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        left: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        right: { style: 'thin', color: { rgb: 'DDDDDD' } },
+      },
     };
 
-    const dataStyle = {
+    // Alternating row colors for zebra striping
+    const evenRowStyle = {
+      fill: { fgColor: { rgb: 'F9FAFB' } }, // Light gray
       alignment: { vertical: 'center' },
       border: {
-        top: { style: 'thin', color: { rgb: 'CCCCCC' } },
-        bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
-        left: { style: 'thin', color: { rgb: 'CCCCCC' } },
-        right: { style: 'thin', color: { rgb: 'CCCCCC' } },
+        top: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      },
+    };
+
+    const oddRowStyle = {
+      fill: { fgColor: { rgb: 'FFFFFF' } }, // White
+      alignment: { vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        bottom: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      },
+    };
+
+    // Highlight mutual match rows with green tint
+    const mutualRowEvenStyle = {
+      fill: { fgColor: { rgb: 'D1FAE5' } }, // Light green
+      alignment: { vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: '10B981' } },
+        bottom: { style: 'thin', color: { rgb: '10B981' } },
+        left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        right: { style: 'thin', color: { rgb: 'E5E7EB' } },
+      },
+    };
+
+    const mutualRowOddStyle = {
+      fill: { fgColor: { rgb: 'ECFDF5' } }, // Lighter green
+      alignment: { vertical: 'center' },
+      border: {
+        top: { style: 'thin', color: { rgb: '10B981' } },
+        bottom: { style: 'thin', color: { rgb: '10B981' } },
+        left: { style: 'thin', color: { rgb: 'E5E7EB' } },
+        right: { style: 'thin', color: { rgb: 'E5E7EB' } },
       },
     };
 
     // Apply styles
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
 
-    // Header row
+    // Header row with vibrant orange
     for (let C = range.s.c; C <= range.e.c; ++C) {
       const address = XLSX.utils.encode_cell({ r: 0, c: C });
       if (!ws[address]) continue;
       ws[address].s = headerStyle;
     }
 
-    // Data rows
+    // Data rows with alternating colors and mutual match highlighting
     for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const rowIndex = R - 1; // 0-indexed for data rows
+      const isMutualMatch = rows[rowIndex] && rows[rowIndex][10] === 'YES';
+      const isEvenRow = rowIndex % 2 === 0;
+
       for (let C = range.s.c; C <= range.e.c; ++C) {
         const address = XLSX.utils.encode_cell({ r: R, c: C });
         if (!ws[address]) continue;
@@ -230,9 +294,9 @@ export async function GET(request: NextRequest) {
         // Mutual Match column (K)
         if (C === 10) {
           if (ws[address].v === 'YES') {
-            ws[address].s = mutualMatchStyle;
+            ws[address].s = mutualMatchYesStyle;
           } else {
-            ws[address].s = dataStyle;
+            ws[address].s = mutualMatchNoStyle;
           }
         }
         // Email Both column (L) - make it a clickable link
@@ -240,9 +304,15 @@ export async function GET(request: NextRequest) {
           ws[address].s = emailLinkStyle;
           ws[address].l = { Target: ws[address].v };
         }
-        // Regular data
+        // Regular data with zebra striping
         else {
-          ws[address].s = dataStyle;
+          if (isMutualMatch) {
+            // Green tinted rows for mutual matches
+            ws[address].s = isEvenRow ? mutualRowEvenStyle : mutualRowOddStyle;
+          } else {
+            // Normal zebra striping
+            ws[address].s = isEvenRow ? evenRowStyle : oddRowStyle;
+          }
         }
       }
     }
@@ -328,29 +398,56 @@ export async function GET(request: NextRequest) {
       // Apply styles to mutual matches sheet
       const mutualRange = XLSX.utils.decode_range(wsMutual['!ref'] || 'A1');
 
-      // Headers
+      // Vibrant green header for mutual matches sheet
+      const mutualHeaderStyle = {
+        fill: { fgColor: { rgb: '10B981' } }, // Emerald green
+        font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 13, name: 'Calibri' },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'medium', color: { rgb: '059669' } },
+          bottom: { style: 'medium', color: { rgb: '059669' } },
+          left: { style: 'thin', color: { rgb: '059669' } },
+          right: { style: 'thin', color: { rgb: '059669' } },
+        },
+      };
+
+      // Special email button style for mutual matches
+      const mutualEmailLinkStyle = {
+        fill: { fgColor: { rgb: 'EF4444' } }, // Red for love/hearts
+        font: { color: { rgb: 'FFFFFF' }, underline: true, bold: true, sz: 11 },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'DDDDDD' } },
+          bottom: { style: 'thin', color: { rgb: 'DDDDDD' } },
+          left: { style: 'thin', color: { rgb: 'DDDDDD' } },
+          right: { style: 'thin', color: { rgb: 'DDDDDD' } },
+        },
+      };
+
+      // Headers with emerald green
       for (let C = mutualRange.s.c; C <= mutualRange.e.c; ++C) {
         const address = XLSX.utils.encode_cell({ r: 0, c: C });
         if (!wsMutual[address]) continue;
-        wsMutual[address].s = {
-          ...headerStyle,
-          fill: { fgColor: { rgb: '10B981' } }, // Green for matches
-        };
+        wsMutual[address].s = mutualHeaderStyle;
       }
 
-      // Data rows
+      // Data rows with alternating green tints
       for (let R = mutualRange.s.r + 1; R <= mutualRange.e.r; ++R) {
+        const rowIndex = R - 1;
+        const isEvenRow = rowIndex % 2 === 0;
+
         for (let C = mutualRange.s.c; C <= mutualRange.e.c; ++C) {
           const address = XLSX.utils.encode_cell({ r: R, c: C });
           if (!wsMutual[address]) continue;
 
-          // Email Both column
+          // Email Both column - vibrant red button
           if (C === 8) {
-            wsMutual[address].s = emailLinkStyle;
+            wsMutual[address].s = mutualEmailLinkStyle;
             wsMutual[address].l = { Target: wsMutual[address].v };
-            wsMutual[address].v = 'Click to Email Both';
+            wsMutual[address].v = '📧 Email Both';
           } else {
-            wsMutual[address].s = dataStyle;
+            // Alternating green tints for all mutual match rows
+            wsMutual[address].s = isEvenRow ? mutualRowEvenStyle : mutualRowOddStyle;
           }
         }
       }
