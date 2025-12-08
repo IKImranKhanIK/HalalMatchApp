@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface ToastProps {
   message: string;
@@ -16,11 +16,17 @@ export default function Toast({
   duration = 5000,
 }: ToastProps) {
   const [progress, setProgress] = useState(100);
+  const onCloseRef = useRef(onClose);
+
+  // Keep the ref updated
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     // Auto-dismiss timer
     const timer = setTimeout(() => {
-      onClose();
+      onCloseRef.current();
     }, duration);
 
     // Progress bar animation (updates every 50ms)
@@ -39,8 +45,7 @@ export default function Toast({
       clearTimeout(timer);
       clearInterval(interval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+  }, [duration]); // Only duration as dependency
 
   const typeStyles = {
     success: {
