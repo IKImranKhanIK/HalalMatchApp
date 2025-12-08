@@ -7,6 +7,8 @@ import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import ErrorMessage from "@/components/shared/ErrorMessage";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Toast from "@/components/ui/Toast";
 
 interface Participant {
   id: string;
@@ -15,8 +17,23 @@ interface Participant {
   email: string;
   phone: string;
   gender: string;
+  age?: number;
+  occupation?: string;
   background_check_status: string;
   created_at: string;
+}
+
+interface ToastState {
+  message: string;
+  type: "success" | "error" | "info";
+}
+
+interface ConfirmDialogState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  variant?: "danger" | "warning" | "info";
 }
 
 // Gender Icon Components
@@ -45,8 +62,15 @@ export default function AdminParticipantsPage() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [ageRangeFilter, setAgeRangeFilter] = useState("all");
+  const [occupationFilter, setOccupationFilter] = useState("all");
   const [updating, setUpdating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [selectedParticipants, setSelectedParticipants] = useState<Set<string>>(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     fetchParticipants();
@@ -54,7 +78,7 @@ export default function AdminParticipantsPage() {
 
   useEffect(() => {
     filterParticipants();
-  }, [participants, searchTerm, statusFilter]);
+  }, [participants, searchTerm, statusFilter, genderFilter, ageRangeFilter, occupationFilter]);
 
   const fetchParticipants = async () => {
     try {
@@ -86,6 +110,30 @@ export default function AdminParticipantsPage() {
       );
     }
 
+    // Filter by gender
+    if (genderFilter !== "all") {
+      filtered = filtered.filter((p) => p.gender === genderFilter);
+    }
+
+    // Filter by age range
+    if (ageRangeFilter !== "all" && ageRangeFilter) {
+      const [min, max] = ageRangeFilter.split("-").map(Number);
+      filtered = filtered.filter((p) => {
+        if (!p.age) return false;
+        if (max) {
+          return p.age >= min && p.age <= max;
+        }
+        return p.age >= min; // For "60+" range
+      });
+    }
+
+    // Filter by occupation
+    if (occupationFilter !== "all") {
+      filtered = filtered.filter((p) =>
+        p.occupation?.toLowerCase().includes(occupationFilter.toLowerCase())
+      );
+    }
+
     // Search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -93,7 +141,9 @@ export default function AdminParticipantsPage() {
         (p) =>
           p.full_name.toLowerCase().includes(term) ||
           p.email.toLowerCase().includes(term) ||
-          p.participant_number.toString().includes(term)
+          p.participant_number.toString().includes(term) ||
+          p.occupation?.toLowerCase().includes(term) ||
+          p.phone.includes(term)
       );
     }
 
@@ -136,31 +186,111 @@ export default function AdminParticipantsPage() {
     }
   };
 
-  const deleteParticipant = async (participantId: string, participantName: string) => {
-    if (!confirm(`Are you sure you want to delete ${participantName}? This will also delete all their selections. This cannot be undone!`)) {
-      return;
+  const deleteParticipant = (participantId: string, participantName: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Participant?",
+      message: `Are you sure you want to delete ${participantName}? This will also delete all their selections. This action cannot be undone!`,
+      variant: "danger",
+      onConfirm: async () => {
+        try {
+          setDeleting(participantId);
+          setError("");
+
+          const response = await fetch(`/api/admin/participants/${participantId}`, {
+            method: "DELETE",
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to delete participant");
+          }
+
+          // Remove from local state
+          setParticipants((prev) => prev.filter((p) => p.id !== participantId));
+          setConfirmDialog(null);
+          setToast({
+            message: "Participant deleted successfully",
+            type: "success",
+          });
+        } catch (err) {
+          setConfirmDialog(null);
+          setToast({
+            message: err instanceof Error ? err.message : "Failed to delete participant",
+            type: "error",
+          });
+        } finally {
+          setDeleting(null);
+        }
+      },
+    });
+  };
+
+  // Bulk Actions
+  const toggleSelectAll = () => {
+    if (selectedParticipants.size === filteredParticipants.length) {
+      setSelectedParticipants(new Set());
+    } else {
+      setSelectedParticipants(new Set(filteredParticipants.map((p) => p.id)));
     }
+  };
 
-    try {
-      setDeleting(participantId);
-      setError("");
-
-      const response = await fetch(`/api/admin/participants/${participantId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete participant");
-      }
-
-      // Remove from local state
-      setParticipants((prev) => prev.filter((p) => p.id !== participantId));
-      alert("Participant deleted successfully");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete participant");
-    } finally {
-      setDeleting(null);
+  const toggleSelectParticipant = (id: string) => {
+    const newSelected = new Set(selectedParticipants);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
     }
+    setSelectedParticipants(newSelected);
+  };
+
+  const bulkUpdateStatus = async (newStatus: string) => {
+    if (selectedParticipants.size === 0) return;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: `${newStatus === "approved" ? "Approve" : "Reject"} ${selectedParticipants.size} Participant(s)?`,
+      message: `Are you sure you want to ${newStatus} ${selectedParticipants.size} selected participant(s)?`,
+      variant: newStatus === "approved" ? "info" : "warning",
+      onConfirm: async () => {
+        try {
+          setBulkUpdating(true);
+          setConfirmDialog(null);
+
+          const updatePromises = Array.from(selectedParticipants).map((id) =>
+            fetch(`/api/admin/participants/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ background_check_status: newStatus }),
+            })
+          );
+
+          await Promise.all(updatePromises);
+
+          // Update local state
+          setParticipants((prev) =>
+            prev.map((p) =>
+              selectedParticipants.has(p.id)
+                ? { ...p, background_check_status: newStatus }
+                : p
+            )
+          );
+
+          setSelectedParticipants(new Set());
+          setToast({
+            message: `Successfully ${newStatus} ${selectedParticipants.size} participant(s)`,
+            type: "success",
+          });
+        } catch (err) {
+          setToast({
+            message: err instanceof Error ? err.message : "Failed to update participants",
+            type: "error",
+          });
+        } finally {
+          setBulkUpdating(false);
+        }
+      },
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -203,10 +333,10 @@ export default function AdminParticipantsPage() {
         <ErrorMessage message={error} onRetry={fetchParticipants} />
       )}
 
-      {/* Filters */}
+      {/* Enhanced Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Input
               label="Search"
               placeholder="Search by name, email, or number..."
@@ -224,9 +354,95 @@ export default function AdminParticipantsPage() {
                 { value: "rejected", label: "Rejected" },
               ]}
             />
+            <Select
+              label="Gender"
+              value={genderFilter}
+              onChange={(e) => setGenderFilter(e.target.value)}
+              options={[
+                { value: "all", label: "All Genders" },
+                { value: "male", label: "Male" },
+                { value: "female", label: "Female" },
+              ]}
+            />
+            <Select
+              label="Age Range"
+              value={ageRangeFilter}
+              onChange={(e) => setAgeRangeFilter(e.target.value)}
+              options={[
+                { value: "all", label: "All Ages" },
+                { value: "18-25", label: "18-25" },
+                { value: "26-35", label: "26-35" },
+                { value: "36-45", label: "36-45" },
+                { value: "46-60", label: "46-60" },
+                { value: "60", label: "60+" },
+              ]}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+            <Select
+              label="Occupation"
+              value={occupationFilter}
+              onChange={(e) => setOccupationFilter(e.target.value)}
+              options={[
+                { value: "all", label: "All Occupations" },
+                { value: "healthcare", label: "Healthcare" },
+                { value: "education", label: "Education" },
+                { value: "technology", label: "Technology" },
+                { value: "business", label: "Business" },
+                { value: "engineering", label: "Engineering" },
+                { value: "law", label: "Law" },
+                { value: "arts", label: "Arts" },
+                { value: "government", label: "Government" },
+                { value: "retail", label: "Retail" },
+                { value: "hospitality", label: "Hospitality" },
+                { value: "construction", label: "Construction" },
+                { value: "student", label: "Student" },
+              ]}
+            />
           </div>
         </CardContent>
       </Card>
+
+      {/* Bulk Actions Bar */}
+      {selectedParticipants.size > 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium">
+                  {selectedParticipants.size} participant(s) selected
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => bulkUpdateStatus("approved")}
+                  disabled={bulkUpdating}
+                  loading={bulkUpdating}
+                >
+                  Bulk Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  onClick={() => bulkUpdateStatus("rejected")}
+                  disabled={bulkUpdating}
+                >
+                  Bulk Reject
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setSelectedParticipants(new Set())}
+                  disabled={bulkUpdating}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Results Count */}
       <div className="text-sm text-[#bfc0c0]">
@@ -246,10 +462,20 @@ export default function AdminParticipantsPage() {
               <table className="w-full">
                 <thead className="border-b border-[#4f5d75]">
                   <tr className="text-left text-sm text-[#bfc0c0]">
+                    <th className="p-4 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={selectedParticipants.size === filteredParticipants.length && filteredParticipants.length > 0}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-[#4f5d75] bg-[#2b2d42] text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                      />
+                    </th>
                     <th className="p-4 font-medium">#</th>
                     <th className="p-4 font-medium">Name</th>
                     <th className="p-4 font-medium">Email</th>
                     <th className="p-4 font-medium">Phone</th>
+                    <th className="p-4 font-medium">Age</th>
+                    <th className="p-4 font-medium">Occupation</th>
                     <th className="p-4 font-medium">Gender</th>
                     <th className="p-4 font-medium">Status</th>
                     <th className="p-4 font-medium">Actions</th>
@@ -259,8 +485,18 @@ export default function AdminParticipantsPage() {
                   {filteredParticipants.map((participant) => (
                     <tr
                       key={participant.id}
-                      className="border-b border-[#4f5d75] hover:bg-[#4f5d75]/20"
+                      className={`border-b border-[#4f5d75] hover:bg-[#4f5d75]/20 ${
+                        selectedParticipants.has(participant.id) ? "bg-blue-500/10" : ""
+                      }`}
                     >
+                      <td className="p-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedParticipants.has(participant.id)}
+                          onChange={() => toggleSelectParticipant(participant.id)}
+                          className="w-4 h-4 rounded border-[#4f5d75] bg-[#2b2d42] text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+                        />
+                      </td>
                       <td className="p-4 font-semibold">
                         {participant.participant_number}
                       </td>
@@ -275,6 +511,12 @@ export default function AdminParticipantsPage() {
                       </td>
                       <td className="p-4 text-sm text-[#bfc0c0]">
                         {participant.phone}
+                      </td>
+                      <td className="p-4 text-sm text-[#bfc0c0]">
+                        {participant.age || "N/A"}
+                      </td>
+                      <td className="p-4 text-sm text-[#bfc0c0] capitalize">
+                        {participant.occupation || "N/A"}
                       </td>
                       <td className="p-4 capitalize text-sm">
                         <div className="flex items-center gap-2">
@@ -333,6 +575,27 @@ export default function AdminParticipantsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          variant={confirmDialog.variant}
+          onConfirm={confirmDialog.onConfirm}
+          onClose={() => setConfirmDialog(null)}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

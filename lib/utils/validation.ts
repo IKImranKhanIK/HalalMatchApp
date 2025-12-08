@@ -15,6 +15,8 @@ export const participantRegistrationSchema = z.object({
   gender: z.enum(['male', 'female'], {
     message: 'Gender must be male or female',
   }),
+  age: z.number().int().min(18, 'Must be at least 18 years old').max(120, 'Invalid age'),
+  occupation: z.string().min(2, 'Occupation must be at least 2 characters').max(100),
   participant_number: z.number().int().positive('Participant number must be a positive number'),
   event_id: z.string().uuid().optional(),
 });
@@ -66,6 +68,8 @@ export const updateParticipantSchema = z.object({
   gender: z.enum(['male', 'female'], {
     message: 'Gender must be male or female',
   }).optional(),
+  age: z.number().int().min(18).max(120).optional(),
+  occupation: z.string().min(2).max(100).optional(),
   background_check_status: z.enum(['pending', 'approved', 'rejected']).optional(),
 });
 

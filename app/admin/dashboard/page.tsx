@@ -7,6 +7,8 @@ import Button from "@/components/ui/Button";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import ErrorMessage from "@/components/shared/ErrorMessage";
 import StatsCard from "@/components/admin/StatsCard";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Toast from "@/components/ui/Toast";
 
 interface DashboardStats {
   totalParticipants: number;
@@ -19,12 +21,27 @@ interface DashboardStats {
   femaleCount: number;
 }
 
+interface ConfirmDialogState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  variant?: "danger" | "warning" | "info";
+}
+
+interface ToastState {
+  message: string;
+  type: "success" | "error" | "info";
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -50,56 +67,85 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleResetSelections = async () => {
-    if (!confirm("Are you sure you want to clear ALL selections? This cannot be undone!")) {
-      return;
-    }
+  const handleResetSelections = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Clear All Selections?",
+      message: "Are you sure you want to clear ALL selections? This action cannot be undone!",
+      variant: "warning",
+      onConfirm: async () => {
+        try {
+          setResetting(true);
+          const response = await fetch("/api/admin/reset/selections", {
+            method: "POST",
+          });
 
-    try {
-      setResetting(true);
-      const response = await fetch("/api/admin/reset/selections", {
-        method: "POST",
-      });
+          if (!response.ok) {
+            throw new Error("Failed to reset selections");
+          }
 
-      if (!response.ok) {
-        throw new Error("Failed to reset selections");
-      }
-
-      alert("All selections have been cleared successfully!");
-      fetchStats();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to reset selections");
-    } finally {
-      setResetting(false);
-    }
+          setConfirmDialog(null);
+          setToast({
+            message: "All selections have been cleared successfully!",
+            type: "success",
+          });
+          fetchStats();
+        } catch (err) {
+          setConfirmDialog(null);
+          setToast({
+            message: err instanceof Error ? err.message : "Failed to reset selections",
+            type: "error",
+          });
+        } finally {
+          setResetting(false);
+        }
+      },
+    });
   };
 
-  const handleResetEverything = async () => {
-    if (!confirm("⚠️ WARNING: This will delete ALL participants and selections. This cannot be undone! Are you absolutely sure?")) {
-      return;
-    }
+  const handleResetEverything = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "⚠️ Delete Everything?",
+      message: "WARNING: This will permanently delete ALL participants and selections. This action cannot be undone! Are you absolutely sure?",
+      variant: "danger",
+      onConfirm: () => {
+        // Show second confirmation
+        setConfirmDialog({
+          isOpen: true,
+          title: "Final Warning",
+          message: "This is your last chance. All data will be permanently deleted. Do you want to continue?",
+          variant: "danger",
+          onConfirm: async () => {
+            try {
+              setResetting(true);
+              const response = await fetch("/api/admin/reset/participants", {
+                method: "POST",
+              });
 
-    if (!confirm("This is your final warning. All data will be permanently deleted. Continue?")) {
-      return;
-    }
+              if (!response.ok) {
+                throw new Error("Failed to reset database");
+              }
 
-    try {
-      setResetting(true);
-      const response = await fetch("/api/admin/reset/participants", {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to reset database");
-      }
-
-      alert("All data has been cleared successfully!");
-      fetchStats();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to reset database");
-    } finally {
-      setResetting(false);
-    }
+              setConfirmDialog(null);
+              setToast({
+                message: "All data has been cleared successfully!",
+                type: "success",
+              });
+              fetchStats();
+            } catch (err) {
+              setConfirmDialog(null);
+              setToast({
+                message: err instanceof Error ? err.message : "Failed to reset database",
+                type: "error",
+              });
+            } finally {
+              setResetting(false);
+            }
+          },
+        });
+      },
+    });
   };
 
   if (loading) {
@@ -380,6 +426,30 @@ export default function AdminDashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirm Dialog */}
+      {confirmDialog && (
+        <ConfirmDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          variant={confirmDialog.variant}
+          confirmText="Yes, Continue"
+          cancelText="Cancel"
+          loading={resetting}
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

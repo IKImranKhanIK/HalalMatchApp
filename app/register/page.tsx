@@ -33,6 +33,9 @@ export default function RegisterPage() {
     email: "",
     phone: "",
     gender: "",
+    age: "",
+    occupation: "",
+    customOccupation: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -100,15 +103,24 @@ export default function RegisterPage() {
     setError("");
 
     try {
+      // Use custom occupation if "Other" is selected
+      const finalOccupation = formData.occupation === "other"
+        ? formData.customOccupation
+        : formData.occupation;
+
       const response = await fetch("/api/participants/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          ...formData,
           participant_number: parseInt(formData.participant_number),
+          full_name: formData.full_name,
+          email: formData.email,
           phone: formData.phone.replace(/\D/g, ''), // Strip formatting for API
+          gender: formData.gender,
+          age: parseInt(formData.age),
+          occupation: finalOccupation,
         }),
       });
 
@@ -324,6 +336,57 @@ export default function RegisterPage() {
                 required
                 disabled={loading}
               />
+
+              <Input
+                label="Age"
+                name="age"
+                type="number"
+                min="18"
+                max="120"
+                value={formData.age}
+                onChange={handleChange}
+                placeholder="Enter your age"
+                required
+                disabled={loading}
+              />
+
+              <Select
+                label="Occupation/Industry"
+                name="occupation"
+                value={formData.occupation}
+                onChange={handleChange}
+                options={[
+                  { value: "", label: "Select Occupation" },
+                  { value: "healthcare", label: "Healthcare" },
+                  { value: "education", label: "Education" },
+                  { value: "technology", label: "Technology/IT" },
+                  { value: "business", label: "Business/Finance" },
+                  { value: "engineering", label: "Engineering" },
+                  { value: "law", label: "Law/Legal" },
+                  { value: "arts", label: "Arts/Media" },
+                  { value: "government", label: "Government/Public Service" },
+                  { value: "retail", label: "Retail/Sales" },
+                  { value: "hospitality", label: "Hospitality/Tourism" },
+                  { value: "construction", label: "Construction/Trades" },
+                  { value: "student", label: "Student" },
+                  { value: "other", label: "Other" },
+                ]}
+                required
+                disabled={loading}
+              />
+
+              {formData.occupation === "other" && (
+                <Input
+                  label="Please specify your occupation"
+                  name="customOccupation"
+                  type="text"
+                  value={formData.customOccupation}
+                  onChange={handleChange}
+                  placeholder="Enter your occupation"
+                  required
+                  disabled={loading}
+                />
+              )}
 
               <Button
                 type="submit"

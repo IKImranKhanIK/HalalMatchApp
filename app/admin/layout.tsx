@@ -1,13 +1,13 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession, signOut, SessionProvider } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import LoadingSpinner from "@/components/shared/LoadingSpinner";
 import Logo from "@/components/shared/Logo";
 
-export default function AdminLayout({
+function AdminLayoutInner({
   children,
 }: {
   children: React.ReactNode;
@@ -109,5 +109,21 @@ export default function AdminLayout({
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">{children}</main>
     </div>
+  );
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <SessionProvider
+      basePath="/api/auth"
+      refetchInterval={5 * 60}
+      refetchOnWindowFocus={true}
+    >
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </SessionProvider>
   );
 }

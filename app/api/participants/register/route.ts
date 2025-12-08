@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
         email: data.email,
         phone: data.phone,
         gender: data.gender,
+        age: data.age,
+        occupation: data.occupation,
         event_id: eventId,
         background_check_status: 'pending',
       })
