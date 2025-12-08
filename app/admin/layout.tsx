@@ -45,6 +45,7 @@ function AdminLayoutInner({
     { href: "/admin/dashboard", label: "Dashboard" },
     { href: "/admin/participants", label: "Participants" },
     { href: "/admin/selections", label: "Selections" },
+    { href: "/admin/history", label: "History" },
     { href: "/admin/registration-qr", label: "QR Code" },
   ];
 
