@@ -55,7 +55,7 @@ export default function AdminDashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
-    fetchStats();
+    fetchStats(false); // Initial load with loading spinner
   }, []);
 
   // Auto-refresh effect
@@ -63,7 +63,7 @@ export default function AdminDashboardPage() {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
-      fetchStats();
+      fetchStats(true); // Silent background refresh
     }, 30000); // 30 seconds
 
     return () => clearInterval(interval);
@@ -89,9 +89,12 @@ export default function AdminDashboardPage() {
     return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
   };
 
-  const fetchStats = async () => {
+  const fetchStats = async (silent = false) => {
     try {
-      setLoading(true);
+      // Only show loading spinner on initial load, not during auto-refresh
+      if (!silent) {
+        setLoading(true);
+      }
       setError("");
 
       // Fetch stats and participants in parallel
@@ -115,9 +118,14 @@ export default function AdminDashboardPage() {
       setParticipants(participantsData.participants || []);
       setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      // Only show error message if not a silent refresh
+      if (!silent) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -143,7 +151,7 @@ export default function AdminDashboardPage() {
             message: "All selections have been cleared successfully!",
             type: "success",
           });
-          fetchStats();
+          fetchStats(true); // Silent refresh after reset
         } catch (err) {
           setConfirmDialog(null);
           setToast({
@@ -186,7 +194,7 @@ export default function AdminDashboardPage() {
                 message: "All data has been cleared successfully!",
                 type: "success",
               });
-              fetchStats();
+              fetchStats(true); // Silent refresh after reset
             } catch (err) {
               setConfirmDialog(null);
               setToast({
@@ -211,11 +219,11 @@ export default function AdminDashboardPage() {
   }
 
   if (error) {
-    return <ErrorMessage message={error} onRetry={fetchStats} />;
+    return <ErrorMessage message={error} onRetry={() => fetchStats(false)} />;
   }
 
   if (!stats) {
-    return <ErrorMessage message="No stats available" onRetry={fetchStats} />;
+    return <ErrorMessage message="No stats available" onRetry={() => fetchStats(false)} />;
   }
 
   return (
