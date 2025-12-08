@@ -226,9 +226,13 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">Dashboard</h1>
             {autoRefresh && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full">
+              <div
+                className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full"
+                title="Dashboard auto-refreshes every 30 seconds"
+              >
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-green-400 text-sm font-medium">Live</span>
+                <span className="text-green-400/60 text-xs ml-0.5">(30s)</span>
               </div>
             )}
           </div>
@@ -236,7 +240,20 @@ export default function AdminDashboardPage() {
             <p className="text-[#bfc0c0]">
               Overview of participant registration and selections
             </p>
-            <span className="text-[#bfc0c0] text-sm">
+            <span className="text-[#bfc0c0] text-sm flex items-center gap-1.5">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
               Last updated: {getTimeSinceUpdate()}
             </span>
           </div>
@@ -246,6 +263,11 @@ export default function AdminDashboardPage() {
             variant="secondary"
             onClick={() => setAutoRefresh(!autoRefresh)}
             className="flex items-center gap-2"
+            title={
+              autoRefresh
+                ? "Pause automatic refresh (currently refreshes every 30 seconds)"
+                : "Resume automatic refresh"
+            }
           >
             <svg
               className="w-4 h-4"
@@ -264,7 +286,12 @@ export default function AdminDashboardPage() {
                 }
               />
             </svg>
-            {autoRefresh ? "Pause" : "Resume"}
+            <span className="flex flex-col items-start leading-tight">
+              <span className="font-medium">
+                {autoRefresh ? "Pause" : "Resume"}
+              </span>
+              <span className="text-xs opacity-60">Auto-Refresh</span>
+            </span>
           </Button>
           <Button
             variant="secondary"
