@@ -18,23 +18,29 @@ export default function Toast({
   const [progress, setProgress] = useState(100);
 
   useEffect(() => {
+    // Auto-dismiss timer
     const timer = setTimeout(() => {
       onClose();
     }, duration);
 
-    // Progress bar animation
+    // Progress bar animation (updates every 50ms)
+    const startTime = Date.now();
     const interval = setInterval(() => {
-      setProgress((prev) => {
-        const newProgress = prev - (100 / duration) * 50;
-        return newProgress < 0 ? 0 : newProgress;
-      });
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 100 - (elapsed / duration) * 100);
+      setProgress(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
     }, 50);
 
     return () => {
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [duration, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   const typeStyles = {
     success: {
