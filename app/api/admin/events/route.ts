@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -68,6 +68,62 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error in events API:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const body = await request.json();
+    const { name, date, location, description, status } = body;
+
+    // Validate required fields
+    if (!name || !date || !location) {
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    // Create new event
+    const { data: event, error: insertError } = await supabase
+      .from("events")
+      .insert([
+        {
+          name,
+          date,
+          location,
+          description: description || "",
+          status: status || "upcoming",
+        },
+      ])
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Error creating event:", insertError);
+      return NextResponse.json(
+        { error: "Failed to create event" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      event,
+    });
+  } catch (error) {
+    console.error("Error in POST events API:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
