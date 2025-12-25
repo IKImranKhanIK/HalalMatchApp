@@ -27,40 +27,65 @@ export async function GET() {
       );
     }
 
-    // For each event, get participants and selections count
-    const eventsWithStats = await Promise.all(
-      (events || []).map(async (event) => {
-        // Get participants for this event
-        const { data: participants } = await supabase
-          .from("participants")
-          .select("gender")
-          .eq("event_id", event.id);
+    if (!events || events.length === 0) {
+      return NextResponse.json({
+        success: true,
+        events: [],
+      });
+    }
 
-        // Get selections for this event
-        const { data: selections } = await supabase
-          .from("interest_selections")
-          .select("is_mutual")
-          .eq("event_id", event.id);
+    // OPTIMIZED: Fetch ALL participants and selections in parallel (2 queries instead of N*2)
+    const [{ data: allParticipants }, { data: allSelections }] = await Promise.all([
+      supabase
+        .from("participants")
+        .select("event_id, gender"),
+      supabase
+        .from("interest_selections")
+        .select("event_id, is_mutual"),
+    ]);
 
-        const participantCount = participants?.length || 0;
-        const maleCount =
-          participants?.filter((p) => p.gender === "male").length || 0;
-        const femaleCount =
-          participants?.filter((p) => p.gender === "female").length || 0;
-        const selectionCount = selections?.length || 0;
-        const mutualMatchCount =
-          selections?.filter((s) => s.is_mutual).length || 0;
+    // Group participants by event_id
+    const participantsByEvent = new Map<string, Array<{ gender: string }>>();
+    if (allParticipants) {
+      for (const participant of allParticipants) {
+        if (!participantsByEvent.has(participant.event_id)) {
+          participantsByEvent.set(participant.event_id, []);
+        }
+        participantsByEvent.get(participant.event_id)!.push({ gender: participant.gender });
+      }
+    }
 
-        return {
-          ...event,
-          participantCount,
-          maleCount,
-          femaleCount,
-          selectionCount,
-          mutualMatchCount,
-        };
-      })
-    );
+    // Group selections by event_id
+    const selectionsByEvent = new Map<string, Array<{ is_mutual: boolean }>>();
+    if (allSelections) {
+      for (const selection of allSelections) {
+        if (!selectionsByEvent.has(selection.event_id)) {
+          selectionsByEvent.set(selection.event_id, []);
+        }
+        selectionsByEvent.get(selection.event_id)!.push({ is_mutual: selection.is_mutual });
+      }
+    }
+
+    // Calculate stats for each event from the grouped data
+    const eventsWithStats = events.map((event) => {
+      const participants = participantsByEvent.get(event.id) || [];
+      const selections = selectionsByEvent.get(event.id) || [];
+
+      const participantCount = participants.length;
+      const maleCount = participants.filter((p) => p.gender === "male").length;
+      const femaleCount = participants.filter((p) => p.gender === "female").length;
+      const selectionCount = selections.length;
+      const mutualMatchCount = selections.filter((s) => s.is_mutual).length;
+
+      return {
+        ...event,
+        participantCount,
+        maleCount,
+        femaleCount,
+        selectionCount,
+        mutualMatchCount,
+      };
+    });
 
     return NextResponse.json({
       success: true,

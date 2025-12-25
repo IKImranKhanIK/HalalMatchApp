@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   PieChart,
   Pie,
@@ -35,8 +36,8 @@ const COLORS = {
 };
 
 export default function AnalyticsCharts({ participants }: AnalyticsChartsProps) {
-  // Gender Distribution Data
-  const genderData = [
+  // Gender Distribution Data - Memoized for performance
+  const genderData = useMemo(() => [
     {
       name: "Male",
       value: participants.filter((p) => p.gender === "male").length,
@@ -47,26 +48,28 @@ export default function AnalyticsCharts({ participants }: AnalyticsChartsProps) 
       value: participants.filter((p) => p.gender === "female").length,
       color: COLORS.female,
     },
-  ].filter((item) => item.value > 0);
+  ].filter((item) => item.value > 0), [participants]);
 
-  // Age Distribution Data
-  const ageRanges = [
-    { range: "18-25", min: 18, max: 25 },
-    { range: "26-35", min: 26, max: 35 },
-    { range: "36-45", min: 36, max: 45 },
-    { range: "46-60", min: 46, max: 60 },
-    { range: "60+", min: 60, max: Infinity },
-  ];
+  // Age Distribution Data - Memoized for performance
+  const ageData = useMemo(() => {
+    const ageRanges = [
+      { range: "18-25", min: 18, max: 25 },
+      { range: "26-35", min: 26, max: 35 },
+      { range: "36-45", min: 36, max: 45 },
+      { range: "46-60", min: 46, max: 60 },
+      { range: "60+", min: 60, max: Infinity },
+    ];
 
-  const ageData = ageRanges.map(({ range, min, max }) => ({
-    name: range,
-    count: participants.filter(
-      (p) => p.age && p.age >= min && p.age <= max
-    ).length,
-  }));
+    return ageRanges.map(({ range, min, max }) => ({
+      name: range,
+      count: participants.filter(
+        (p) => p.age && p.age >= min && p.age <= max
+      ).length,
+    }));
+  }, [participants]);
 
-  // Background Check Status Data
-  const statusData = [
+  // Background Check Status Data - Memoized for performance
+  const statusData = useMemo(() => [
     {
       name: "Pending",
       value: participants.filter((p) => p.background_check_status === "pending")
@@ -87,24 +90,26 @@ export default function AnalyticsCharts({ participants }: AnalyticsChartsProps) 
       ).length,
       color: COLORS.danger,
     },
-  ].filter((item) => item.value > 0);
+  ].filter((item) => item.value > 0), [participants]);
 
-  // Occupation Distribution Data (Top 10)
-  const occupationCounts = participants.reduce((acc, p) => {
-    if (p.occupation) {
-      const occupation = p.occupation.toLowerCase().trim();
-      acc[occupation] = (acc[occupation] || 0) + 1;
-    }
-    return acc;
-  }, {} as Record<string, number>);
+  // Occupation Distribution Data (Top 10) - Memoized for performance
+  const occupationData = useMemo(() => {
+    const occupationCounts = participants.reduce((acc, p) => {
+      if (p.occupation) {
+        const occupation = p.occupation.toLowerCase().trim();
+        acc[occupation] = (acc[occupation] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
 
-  const occupationData = Object.entries(occupationCounts)
-    .map(([name, count]) => ({
-      name: name.charAt(0).toUpperCase() + name.slice(1),
-      count,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+    return Object.entries(occupationCounts)
+      .map(([name, count]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        count,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }, [participants]);
 
   // Custom Tooltip
   const CustomTooltip = ({ active, payload }: any) => {

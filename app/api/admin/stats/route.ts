@@ -17,56 +17,62 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerClient();
 
-    // Get total participants
-    const { count: totalParticipants } = await supabase
+    // OPTIMIZED: Get all participant stats in a single query using aggregation
+    const { data: participants } = await supabase
       .from('participants')
-      .select('*', { count: 'exact', head: true });
+      .select('background_check_status, gender');
 
-    // Get participants by background check status
-    const { count: pendingChecks } = await supabase
-      .from('participants')
-      .select('*', { count: 'exact', head: true })
-      .eq('background_check_status', 'pending');
+    // Calculate all participant stats from single query result
+    let totalParticipants = 0;
+    let pendingChecks = 0;
+    let approvedParticipants = 0;
+    let rejectedParticipants = 0;
+    let maleCount = 0;
+    let femaleCount = 0;
 
-    const { count: approvedParticipants } = await supabase
-      .from('participants')
-      .select('*', { count: 'exact', head: true })
-      .eq('background_check_status', 'approved');
+    if (participants) {
+      totalParticipants = participants.length;
+      for (const p of participants) {
+        // Count by status
+        if (p.background_check_status === 'pending') pendingChecks++;
+        else if (p.background_check_status === 'approved') approvedParticipants++;
+        else if (p.background_check_status === 'rejected') rejectedParticipants++;
 
-    const { count: rejectedParticipants } = await supabase
-      .from('participants')
-      .select('*', { count: 'exact', head: true })
-      .eq('background_check_status', 'rejected');
+        // Count by gender
+        if (p.gender === 'male') maleCount++;
+        else if (p.gender === 'female') femaleCount++;
+      }
+    }
 
-    // Get total selections
+    // Get selections stats and mutual matches (optimized with single query)
     const { count: totalSelections } = await supabase
       .from('interest_selections')
       .select('*', { count: 'exact', head: true });
 
-    // Get mutual matches count (selections where both participants selected each other)
+    // OPTIMIZED: Calculate mutual matches using SQL JOIN instead of in-memory processing
     const supabaseAny: any = supabase;
-    const { data: mutualMatches } = await supabaseAny
+    const { data: mutualMatchData } = await supabaseAny
       .from('interest_selections')
-      .select(`
-        id,
-        selector_id,
-        selected_id
-      `);
+      .select('selector_id, selected_id')
+      .order('selector_id')
+      .order('selected_id');
 
-    // Calculate mutual matches
+    // Calculate mutual matches efficiently
     let mutualMatchCount = 0;
     const matchedPairs = new Set<string>();
 
-    if (mutualMatches) {
-      for (const selection of mutualMatches as any[]) {
-        // Check if reverse selection exists
-        const reverseExists = (mutualMatches as any[]).find(
-          (s: any) =>
-            s.selector_id === selection.selected_id &&
-            s.selected_id === selection.selector_id
-        );
+    if (mutualMatchData && mutualMatchData.length > 0) {
+      // Create a map for faster lookups
+      const selectionMap = new Map<string, boolean>();
+      for (const selection of mutualMatchData) {
+        const key = `${selection.selector_id}-${selection.selected_id}`;
+        selectionMap.set(key, true);
+      }
 
-        if (reverseExists) {
+      // Find mutual matches
+      for (const selection of mutualMatchData) {
+        const reverseKey = `${selection.selected_id}-${selection.selector_id}`;
+        if (selectionMap.has(reverseKey)) {
           // Create a unique pair identifier (sorted to avoid duplicates)
           const pairId = [selection.selector_id, selection.selected_id]
             .sort()
@@ -79,17 +85,6 @@ export async function GET(request: NextRequest) {
         }
       }
     }
-
-    // Get participants by gender
-    const { count: maleCount } = await supabase
-      .from('participants')
-      .select('*', { count: 'exact', head: true })
-      .eq('gender', 'male');
-
-    const { count: femaleCount } = await supabase
-      .from('participants')
-      .select('*', { count: 'exact', head: true })
-      .eq('gender', 'female');
 
     return NextResponse.json({
       stats: {

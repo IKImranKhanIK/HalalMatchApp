@@ -66,23 +66,23 @@ export default function AdminSelectionsPage() {
     filterSelections();
   }, [selections, showMutualOnly]);
 
-  // Auto-refresh effect - every 10 seconds for real-time feel
+  // Auto-refresh effect - Optimized to 60 seconds for better performance
   useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
       fetchSelections(true); // Silent background refresh
-    }, 10000); // 10 seconds
+    }, 60000); // 60 seconds (reduced from 10s for much better performance)
 
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  // Force re-render every second to update "time ago"
+  // Update "time ago" every 10 seconds (instead of every 1 second)
   const [, setTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((tick) => tick + 1);
-    }, 1000);
+    }, 10000); // 10 seconds (reduced from 1s for much better performance)
 
     return () => clearInterval(interval);
   }, []);
@@ -235,11 +235,11 @@ export default function AdminSelectionsPage() {
             {autoRefresh && (
               <div
                 className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full"
-                title="Auto-refreshes every 10 seconds to show new selections"
+                title="Auto-refreshes every 60 seconds to show new selections"
               >
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-green-400 text-sm font-medium">Live</span>
-                <span className="text-green-400/60 text-xs ml-0.5">(10s)</span>
+                <span className="text-green-400/60 text-xs ml-0.5">(60s)</span>
               </div>
             )}
           </div>

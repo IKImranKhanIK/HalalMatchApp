@@ -58,23 +58,23 @@ export default function AdminDashboardPage() {
     fetchStats(false); // Initial load with loading spinner
   }, []);
 
-  // Auto-refresh effect
+  // Auto-refresh effect - Optimized to 60 seconds
   useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
       fetchStats(true); // Silent background refresh
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds (reduced from 30s for better performance)
 
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  // Force re-render every second to update "Last updated" time
+  // Update "Last updated" time every 10 seconds (instead of every 1 second)
   const [, setTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((tick) => tick + 1);
-    }, 1000);
+    }, 10000); // 10 seconds (reduced from 1s for much better performance)
 
     return () => clearInterval(interval);
   }, []);
@@ -236,11 +236,11 @@ export default function AdminDashboardPage() {
             {autoRefresh && (
               <div
                 className="flex items-center gap-2 px-3 py-1 bg-green-500/20 border border-green-500/30 rounded-full"
-                title="Dashboard auto-refreshes every 30 seconds"
+                title="Dashboard auto-refreshes every 60 seconds"
               >
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-green-400 text-sm font-medium">Live</span>
-                <span className="text-green-400/60 text-xs ml-0.5">(30s)</span>
+                <span className="text-green-400/60 text-xs ml-0.5">(60s)</span>
               </div>
             )}
           </div>
@@ -273,7 +273,7 @@ export default function AdminDashboardPage() {
             className="flex items-center gap-2"
             title={
               autoRefresh
-                ? "Pause automatic refresh (currently refreshes every 30 seconds)"
+                ? "Pause automatic refresh (currently refreshes every 60 seconds)"
                 : "Resume automatic refresh"
             }
           >
