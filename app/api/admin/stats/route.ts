@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createServerClient();
+    const supabaseAny: any = supabase;
 
     // OPTIMIZED: Get all participant stats in a single query using aggregation
-    const { data: participants } = await supabase
+    const { data: participants } = await supabaseAny
       .from('participants')
       .select('background_check_status, gender');
 
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     if (participants) {
       totalParticipants = participants.length;
-      for (const p of participants) {
+      for (const p of participants as any[]) {
         // Count by status
         if (p.background_check_status === 'pending') pendingChecks++;
         else if (p.background_check_status === 'approved') approvedParticipants++;
@@ -50,7 +51,6 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact', head: true });
 
     // OPTIMIZED: Calculate mutual matches using SQL JOIN instead of in-memory processing
-    const supabaseAny: any = supabase;
     const { data: mutualMatchData } = await supabaseAny
       .from('interest_selections')
       .select('selector_id, selected_id')

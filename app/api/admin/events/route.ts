@@ -35,11 +35,12 @@ export async function GET() {
     }
 
     // OPTIMIZED: Fetch ALL participants and selections in parallel (2 queries instead of N*2)
+    const supabaseAny: any = supabase;
     const [{ data: allParticipants }, { data: allSelections }] = await Promise.all([
-      supabase
+      supabaseAny
         .from("participants")
         .select("event_id, gender"),
-      supabase
+      supabaseAny
         .from("interest_selections")
         .select("event_id, is_mutual"),
     ]);
@@ -47,7 +48,7 @@ export async function GET() {
     // Group participants by event_id
     const participantsByEvent = new Map<string, Array<{ gender: string }>>();
     if (allParticipants) {
-      for (const participant of allParticipants) {
+      for (const participant of allParticipants as any[]) {
         if (!participantsByEvent.has(participant.event_id)) {
           participantsByEvent.set(participant.event_id, []);
         }
@@ -58,7 +59,7 @@ export async function GET() {
     // Group selections by event_id
     const selectionsByEvent = new Map<string, Array<{ is_mutual: boolean }>>();
     if (allSelections) {
-      for (const selection of allSelections) {
+      for (const selection of allSelections as any[]) {
         if (!selectionsByEvent.has(selection.event_id)) {
           selectionsByEvent.set(selection.event_id, []);
         }
